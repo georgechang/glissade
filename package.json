@@ -3,29 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Turn a screenshot or URL into a scrolling MP4/GIF animation for slide decks.",
-  "engines": {
-    "node": ">=22"
-  },
-  "workspaces": [
-    "packages/shared",
-    "packages/core",
-    "packages/cli",
-    "packages/scroll-engine"
-  ],
+  "engines": { "node": ">=22" },
+  "workspaces": ["packages/shared", "packages/scroll-engine"],
   "scripts": {
-    "build": "npm run build --workspace=@page-capture/shared --workspace=@page-capture/core --workspace=@page-capture/cli --if-present",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "npm run build --workspace=@page-capture/shared --workspace=@page-capture/scroll-engine --if-present",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:docker": "bash packages/worker/docker-test.sh",
-    "samples": "npm run build && tsx scripts/generate-samples.ts"
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
-    "playwright": "1.59.1",
+    "happy-dom": "^15.0.0",
     "tsup": "^8.3.5",
-    "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^3.0.0"
   }

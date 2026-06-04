@@ -5,7 +5,7 @@
     "baseUrl": ".",
     "paths": {
       "@page-capture/shared": ["packages/shared/src/index.ts"],
-      "@page-capture/core": ["packages/core/src/index.ts"]
+      "@page-capture/scroll-engine": ["packages/scroll-engine/src/index.ts"]
     }
   },
   "include": [
