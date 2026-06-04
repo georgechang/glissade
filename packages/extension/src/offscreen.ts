@@ -22,6 +22,7 @@ async function run(m: Extract<Msg, { type: 'capture:start' }>): Promise<void> {
         maxWidth: m.width, maxHeight: m.height, maxFrameRate: m.fps } } as MediaTrackConstraints,
     });
     const track = stream.getVideoTracks()[0] as MediaStreamVideoTrack;
+    track.addEventListener('ended', () => controller.abort());
     const { buffer, encoder } = await encodeTabStream({
       track, width: m.width, height: m.height, fps: m.fps, totalFrames: m.totalFrames,
       signal: controller.signal,

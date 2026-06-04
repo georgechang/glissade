@@ -57,15 +57,29 @@ async function drive(fps: number, plan: { totalFrames: number; offsetForFrame: (
   window.scrollTo(0, 0);
   await new Promise((r) => requestAnimationFrame(() => r(undefined)));
   const t0 = performance.now();
-  await new Promise<void>((resolve) => {
-    const tick = () => {
-      const frame = frameAtElapsed(performance.now() - t0, fps, plan.totalFrames);
-      window.scrollTo(0, plan.offsetForFrame(frame));
-      browser.runtime.sendMessage({ type: 'drive:progress', frame, totalFrames: plan.totalFrames }).catch(() => {});
-      if (frame >= plan.totalFrames - 1) { resolve(); return; }
+  let aborted = false;
+  const onVisibility = () => {
+    if (document.visibilityState === 'hidden' && !aborted) {
+      aborted = true;
+      browser.runtime.sendMessage({ type: 'abort' }).catch(() => {});
+      console.warn('page-capture: tab left foreground — capture aborted');
+    }
+  };
+  document.addEventListener('visibilitychange', onVisibility);
+  try {
+    await new Promise<void>((resolve) => {
+      const tick = () => {
+        if (aborted) { resolve(); return; }
+        const frame = frameAtElapsed(performance.now() - t0, fps, plan.totalFrames);
+        window.scrollTo(0, plan.offsetForFrame(frame));
+        browser.runtime.sendMessage({ type: 'drive:progress', frame, totalFrames: plan.totalFrames }).catch(() => {});
+        if (frame >= plan.totalFrames - 1) { resolve(); return; }
+        requestAnimationFrame(tick);
+      };
       requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  });
-  browser.runtime.sendMessage({ type: 'drive:done' }).catch(() => {});
+    });
+  } finally {
+    document.removeEventListener('visibilitychange', onVisibility);
+  }
+  if (!aborted) browser.runtime.sendMessage({ type: 'drive:done' }).catch(() => {});
 }
