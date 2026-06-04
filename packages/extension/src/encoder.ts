@@ -23,6 +23,7 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
  */
 export async function encodeTabStream(p: EncodeParams): Promise<EncodeResult> {
   const bitrate = p.bitrate ?? 14_000_000;
+  if (p.track.readyState === 'ended') throw new Error('capture track already ended');
   if (!(await canEncodeVideo('avc', { width: p.width, height: p.height, bitrate }))) {
     throw new Error('H.264 (avc) encoding not supported on this machine');
   }
@@ -37,11 +38,16 @@ export async function encodeTabStream(p: EncodeParams): Promise<EncodeResult> {
   let latest: VideoFrame | null = null;
   let reading = true;
   const pump = (async () => {
-    while (reading) {
-      const { value, done } = await reader.read();
-      if (done) break;
+    try {
+      while (reading) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        latest?.close();
+        latest = value;
+      }
+    } finally {
       latest?.close();
-      latest = value;
+      latest = null;
     }
   })();
 
@@ -53,6 +59,7 @@ export async function encodeTabStream(p: EncodeParams): Promise<EncodeResult> {
       const due = t0 + n * slotMs;
       const wait = due - performance.now();
       if (wait > 0) await sleep(wait);
+      if (p.signal.aborted) throw new Error('aborted');
       if (latest) ctx.drawImage(latest, 0, 0, p.width, p.height);
       await source.add(n / p.fps, 1 / p.fps);
       p.onProgress?.(n + 1);
