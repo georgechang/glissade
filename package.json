@@ -1,0 +1,31 @@
+{
+  "name": "page-capture-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Turn a screenshot or URL into a scrolling MP4/GIF animation for slide decks.",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "packages/shared",
+    "packages/core",
+    "packages/cli"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace=@page-capture/shared --workspace=@page-capture/core --workspace=@page-capture/cli --if-present",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:docker": "bash packages/worker/docker-test.sh",
+    "samples": "npm run build && tsx scripts/generate-samples.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "playwright": "1.59.1",
+    "tsup": "^8.3.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^3.0.0"
+  }
+}

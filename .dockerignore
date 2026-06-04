@@ -1,0 +1,11 @@
+node_modules
+**/node_modules
+dist
+**/dist
+.git
+*.tsbuildinfo
+coverage
+tmp
+samples/*.mp4
+samples/*.gif
+samples/source-screenshot.png

@@ -1,0 +1,29 @@
+[
+	{
+		"selector": "#content > div:nth-child(2)"
+	},
+	{
+		"selector": "#content > div:nth-child(3)"
+	},
+	{
+		"selector": "#content > div:nth-child(4)"
+	},
+	{
+		"selector": "#content > div:nth-child(5)"
+	},
+	{
+		"selector": "#content > div:nth-child(6)"
+	},
+	{
+		"selector": "#content > div:nth-child(7)"
+	},
+	{
+		"selector": "#content > div:nth-child(8)"
+	},
+	{
+		"selector": "#content > div:nth-child(9)"
+	},
+	{
+		"selector": "#footer"
+	}
+]
