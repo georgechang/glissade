@@ -11,7 +11,14 @@
   "include": [
     "packages/*/src/**/*.ts",
     "packages/*/test/**/*.ts",
-    "scripts/**/*.ts",
     "vitest.config.ts"
+  ],
+  "comment": "The extension self-typechecks via WXT (its own tsconfig has DOM/chrome libs + browser-only @types). Root typecheck covers shared + scroll-engine only.",
+  "exclude": [
+    "node_modules",
+    "packages/extension/**",
+    "**/dist/**",
+    "**/.wxt/**",
+    "**/.output/**"
   ]
 }
