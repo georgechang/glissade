@@ -4,9 +4,11 @@
   "private": true,
   "type": "module",
   "engines": { "node": ">=22" },
-  "workspaces": ["packages/shared", "packages/scroll-engine"],
+  "workspaces": ["packages/shared", "packages/scroll-engine", "packages/extension"],
   "scripts": {
-    "build": "npm run build --workspace=@page-capture/shared --workspace=@page-capture/scroll-engine --if-present",
+    "build": "npm run build --workspace=@page-capture/shared --workspace=@page-capture/scroll-engine --if-present && npm run build --workspace=@page-capture/extension --if-present",
+    "dev": "npm run dev --workspace=@page-capture/extension",
+    "zip": "npm run zip --workspace=@page-capture/extension",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json --noEmit"
