@@ -11,7 +11,8 @@ export const DEFAULT_CONSENT_SELECTORS = [
 export const DEFAULT_CONSENT_TEXTS = ['accept all', 'accept', 'i agree', 'got it'];
 
 export function neutralizeLazyImages(doc: Document): Promise<void> {
-  for (const img of Array.from(doc.images)) {
+  const images = Array.from(doc.querySelectorAll<HTMLImageElement>('img'));
+  for (const img of images) {
     const ds = img.getAttribute('data-src');
     if (ds && !img.getAttribute('src')) img.setAttribute('src', ds);
     const dss = img.getAttribute('data-srcset');
@@ -19,7 +20,7 @@ export function neutralizeLazyImages(doc: Document): Promise<void> {
     img.loading = 'eager';
   }
   return Promise.all(
-    Array.from(doc.images).map((i) => (i.complete ? Promise.resolve() : i.decode().catch(() => undefined))),
+    images.map((i) => (i.complete ? Promise.resolve() : i.decode().catch(() => undefined))),
   ).then(() => undefined);
 }
 
