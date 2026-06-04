@@ -243,32 +243,3 @@ export interface CaptureProgress {
   percent?: number;
   message?: string;
 }
-
-// ---------------------------------------------------------------------------
-// Async job contracts (used later by the web API + worker; locked in now so the
-// SPA and worker can be built in parallel against a stable shape).
-// ---------------------------------------------------------------------------
-
-export const JOB_STATUSES = ['queued', 'running', 'succeeded', 'failed'] as const;
-export type JobState = (typeof JOB_STATUSES)[number];
-
-export const JobStatusSchema = z.object({
-  jobId: z.string().min(1),
-  status: z.enum(JOB_STATUSES),
-  percent: z.number().min(0).max(100).optional(),
-  phase: z.enum(CAPTURE_PHASES).optional(),
-  message: z.string().optional(),
-  /** Blob path of the finished artifact (set when succeeded). */
-  blobPath: z.string().optional(),
-  /** Sanitized failure reason (set when failed). */
-  error: z.string().optional(),
-  createdAt: z.string().optional(),
-});
-export type JobStatus = z.infer<typeof JobStatusSchema>;
-
-/** A queued unit of work: a jobId + the request to run. */
-export const JobSchema = z.object({
-  jobId: z.string().min(1),
-  request: CaptureOptionsSchema,
-});
-export type Job = z.infer<typeof JobSchema>;

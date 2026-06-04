@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   CaptureOptionsSchema,
   DEFAULTS,
-  JobStatusSchema,
   type CaptureOptions,
 } from '@page-capture/shared';
 
@@ -160,24 +159,5 @@ describe('CaptureOptionsSchema — stops', () => {
 
   it('rejects an out-of-range percent', () => {
     expect(withStops([{ percent: 140 }]).success).toBe(false);
-  });
-});
-
-describe('JobStatusSchema', () => {
-  it('parses a valid succeeded job', () => {
-    const job = JobStatusSchema.parse({
-      jobId: 'abc',
-      status: 'succeeded',
-      percent: 100,
-      phase: 'finalize',
-      blobPath: 'outputs/abc.mp4',
-    });
-    expect(job.status).toBe('succeeded');
-  });
-
-  it('rejects an unknown status', () => {
-    expect(
-      JobStatusSchema.safeParse({ jobId: 'x', status: 'exploded' }).success,
-    ).toBe(false);
   });
 });
