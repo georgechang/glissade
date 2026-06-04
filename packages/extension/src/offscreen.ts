@@ -27,9 +27,12 @@ async function run(m: Extract<Msg, { type: 'capture:start' }>): Promise<void> {
       signal: controller.signal,
       onProgress: (frame) => browser.runtime.sendMessage({ type: 'capture:progress', frame, totalFrames: m.totalFrames } satisfies Msg).catch(() => {}),
     });
-    const url = URL.createObjectURL(new Blob([buffer], { type: 'video/mp4' }));
+    const isWebm = encoder.includes('webm');
+    const blobType = isWebm ? 'video/webm' : 'video/mp4';
+    const filename = isWebm ? 'page-capture.webm' : 'page-capture.mp4';
+    const url = URL.createObjectURL(new Blob([buffer], { type: blobType }));
     try {
-      await browser.downloads.download({ url, filename: 'page-capture.mp4', saveAs: true });
+      await browser.downloads.download({ url, filename, saveAs: true });
     } finally {
       URL.revokeObjectURL(url);
     }

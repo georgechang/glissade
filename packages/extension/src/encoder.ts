@@ -25,7 +25,7 @@ export async function encodeTabStream(p: EncodeParams): Promise<EncodeResult> {
   const bitrate = p.bitrate ?? 14_000_000;
   if (p.track.readyState === 'ended') throw new Error('capture track already ended');
   if (!(await canEncodeVideo('avc', { width: p.width, height: p.height, bitrate }))) {
-    throw new Error('H.264 (avc) encoding not supported on this machine');
+    return recordWithMediaRecorder(p);
   }
   const canvas = new OffscreenCanvas(p.width, p.height);
   const ctx = canvas.getContext('2d', { alpha: false })!;
@@ -73,4 +73,35 @@ export async function encodeTabStream(p: EncodeParams): Promise<EncodeResult> {
   }
   await output.finalize();
   return { buffer: output.target.buffer!, encoder: 'webcodecs-avc' };
+}
+
+/**
+ * Robustness floor: when WebCodecs avc encoding is unavailable, record the live
+ * track with MediaRecorder. Prefers an MP4/avc1 container when the platform
+ * supports it, else WebM/VP9. This path is variable-frame-rate (no CFR reclock)
+ * and exists only so the user always gets *a* file. Stops after the planned
+ * duration (totalFrames / fps) or on abort.
+ */
+async function recordWithMediaRecorder(p: EncodeParams): Promise<EncodeResult> {
+  const MP4 = 'video/mp4;codecs=avc1.42E01E';
+  const WEBM = 'video/webm;codecs=vp9';
+  const mimeType = MediaRecorder.isTypeSupported(MP4) ? MP4 : WEBM;
+  const isWebm = mimeType.startsWith('video/webm');
+
+  const stream = new MediaStream([p.track]);
+  const rec = new MediaRecorder(stream, { mimeType });
+  const chunks: Blob[] = [];
+  rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+  const stopped = new Promise<void>((resolve) => { rec.onstop = () => resolve(); });
+  rec.start(1000); // 1s timeslices keep memory bounded for long captures
+
+  const stopAt = performance.now() + (p.totalFrames / p.fps) * 1000;
+  while (!p.signal.aborted && performance.now() < stopAt) await sleep(50);
+
+  if (rec.state !== 'inactive') rec.stop();
+  await stopped;
+  p.track.stop();
+
+  const blob = new Blob(chunks, { type: isWebm ? 'video/webm' : 'video/mp4' });
+  return { buffer: await blob.arrayBuffer(), encoder: isWebm ? 'mediarecorder-webm' : 'mediarecorder-mp4' };
 }
