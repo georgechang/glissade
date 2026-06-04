@@ -35,13 +35,13 @@ async function run(m: Extract<Msg, { type: 'capture:start' }>): Promise<void> {
     const isWebm = encoder.includes('webm');
     const blobType = isWebm ? 'video/webm' : 'video/mp4';
     const filename = isWebm ? 'page-capture.webm' : 'page-capture.mp4';
+    // chrome.downloads is NOT exposed to offscreen documents — create the blob URL
+    // here (offscreen has DOM + URL) and hand it to the background service worker,
+    // which owns chrome.downloads. This doc stays alive so the URL resolves; revoke
+    // after a delay, by which point the download has been fetched.
     const url = URL.createObjectURL(new Blob([buffer], { type: blobType }));
-    try {
-      await browser.downloads.download({ url, filename, saveAs: true });
-    } finally {
-      URL.revokeObjectURL(url);
-    }
-    browser.runtime.sendMessage({ type: 'capture:done', ok: true, encoder } satisfies Msg).catch(() => {});
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    browser.runtime.sendMessage({ type: 'capture:done', ok: true, encoder, url, filename } satisfies Msg).catch(() => {});
   } catch (e) {
     browser.runtime.sendMessage({ type: 'capture:done', ok: false, error: (e as Error).message } satisfies Msg).catch(() => {});
   } finally {

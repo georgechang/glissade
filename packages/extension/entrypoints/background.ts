@@ -21,9 +21,13 @@ export default defineBackground(() => {
     );
     return true; // async sendResponse
   });
-  // If the offscreen capture fails, stop the (now pointless) scroll in the content tab.
+  // The offscreen doc has no chrome.downloads, so it hands us the blob URL to save.
+  // On success → download; on failure → stop the (now pointless) scroll in the content tab.
   browser.runtime.onMessage.addListener((raw) => {
-    if (isMessage(raw) && raw.type === 'capture:done' && !raw.ok && activeTabId !== undefined) {
+    if (!isMessage(raw) || raw.type !== 'capture:done') return;
+    if (raw.ok) {
+      browser.downloads.download({ url: raw.url, filename: raw.filename, saveAs: true }).catch(() => {});
+    } else if (activeTabId !== undefined) {
       browser.tabs.sendMessage(activeTabId, { type: 'abort' } satisfies Msg).catch(() => {});
     }
   });

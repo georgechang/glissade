@@ -8,8 +8,10 @@ export type Msg =
   // content → background
   | { type: 'drive:done' }
   | { type: 'drive:progress'; frame: number; totalFrames: number }
-  // offscreen → background → popup
-  | { type: 'capture:done'; ok: true; encoder: string } | { type: 'capture:done'; ok: false; error: string }
+  // offscreen → background (download) → popup (status). The offscreen has no
+  // chrome.downloads, so it passes the blob URL + filename for the SW to save.
+  | { type: 'capture:done'; ok: true; encoder: string; url: string; filename: string }
+  | { type: 'capture:done'; ok: false; error: string }
   | { type: 'capture:progress'; frame: number; totalFrames: number }
   | { type: 'abort' };
 
