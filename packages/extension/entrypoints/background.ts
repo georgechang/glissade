@@ -1,5 +1,7 @@
 import { isMessage, type Msg } from '../src/messages';
 
+let activeTabId: number | undefined;
+
 async function ensureOffscreen(): Promise<void> {
   if (await browser.offscreen.hasDocument()) return;
   await browser.offscreen.createDocument({
@@ -19,11 +21,18 @@ export default defineBackground(() => {
     );
     return true; // async sendResponse
   });
+  // If the offscreen capture fails, stop the (now pointless) scroll in the content tab.
+  browser.runtime.onMessage.addListener((raw) => {
+    if (isMessage(raw) && raw.type === 'capture:done' && !raw.ok && activeTabId !== undefined) {
+      browser.tabs.sendMessage(activeTabId, { type: 'abort' } satisfies Msg).catch(() => {});
+    }
+  });
 });
 
 async function start(options: unknown): Promise<void> {
   const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) throw new Error('no active tab');
+  activeTabId = tab.id;
   await browser.tabs.setZoom(tab.id, 1).catch(() => undefined); // normalize zoom → crisp 1:1 capture
   const fps = readFps(options);
 

@@ -4,10 +4,12 @@ import { encodeTabStream } from './encoder';
 
 let busy = false;
 let controller = new AbortController();
+let doneController = new AbortController();
 
 browser.runtime.onMessage.addListener((raw) => {
   if (!isMessage(raw)) return;
   if (raw.type === 'abort') { controller.abort(); return; }
+  if (raw.type === 'drive:done') { doneController.abort(); return; }
   if (raw.type !== 'capture:start') return;
   void run(raw);
 });
@@ -16,6 +18,7 @@ async function run(m: Extract<Msg, { type: 'capture:start' }>): Promise<void> {
   if (busy) return;
   busy = true;
   controller = new AbortController();
+  doneController = new AbortController();
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: m.streamId,
@@ -26,6 +29,7 @@ async function run(m: Extract<Msg, { type: 'capture:start' }>): Promise<void> {
     const { buffer, encoder } = await encodeTabStream({
       track, width: m.width, height: m.height, fps: m.fps, totalFrames: m.totalFrames,
       signal: controller.signal,
+      done: doneController.signal,
       onProgress: (frame) => browser.runtime.sendMessage({ type: 'capture:progress', frame, totalFrames: m.totalFrames } satisfies Msg).catch(() => {}),
     });
     const isWebm = encoder.includes('webm');

@@ -9,6 +9,8 @@ export interface EncodeParams {
   totalFrames: number;
   bitrate?: number;
   signal: AbortSignal;
+  /** Aborted when the scroll has finished — the encoder then finalizes what it has. */
+  done: AbortSignal;
   onProgress?: (frame: number) => void;
 }
 export interface EncodeResult { buffer: ArrayBuffer; encoder: string }
@@ -53,13 +55,20 @@ export async function encodeTabStream(p: EncodeParams): Promise<EncodeResult> {
 
   const slotMs = 1000 / p.fps;
   const t0 = performance.now();
+  // Record on the fixed grid until the scroll signals completion (p.done), or abort,
+  // or a safety cap (never run more than ~2s past the planned length). Stopping on the
+  // scroll-done signal — not a fixed frame count — guarantees the whole scroll (incl.
+  // its end-hold/tail) is captured even though the encoder clock starts slightly early.
+  const hardCap = p.totalFrames + Math.ceil(p.fps * 2);
   try {
-    for (let n = 0; n < p.totalFrames; n++) {
+    for (let n = 0; n < hardCap; n++) {
       if (p.signal.aborted) throw new Error('aborted');
+      if (p.done.aborted) break;
       const due = t0 + n * slotMs;
       const wait = due - performance.now();
       if (wait > 0) await sleep(wait);
       if (p.signal.aborted) throw new Error('aborted');
+      if (p.done.aborted) break;
       if (latest) ctx.drawImage(latest, 0, 0, p.width, p.height);
       await source.add(n / p.fps, 1 / p.fps);
       p.onProgress?.(n + 1);
@@ -92,14 +101,17 @@ async function recordWithMediaRecorder(p: EncodeParams): Promise<EncodeResult> {
   const rec = new MediaRecorder(stream, { mimeType });
   const chunks: Blob[] = [];
   rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
-  const stopped = new Promise<void>((resolve) => { rec.onstop = () => resolve(); });
+  const stopped = new Promise<void>((resolve) => {
+    rec.onstop = () => resolve();
+    rec.onerror = () => resolve();
+  });
   rec.start(1000); // 1s timeslices keep memory bounded for long captures
 
   const stopAt = performance.now() + (p.totalFrames / p.fps) * 1000;
-  while (!p.signal.aborted && performance.now() < stopAt) await sleep(50);
+  while (!p.signal.aborted && !p.done.aborted && performance.now() < stopAt) await sleep(50);
 
   if (rec.state !== 'inactive') rec.stop();
-  await stopped;
+  await Promise.race([stopped, sleep(2000)]); // never hang if onstop/onerror never fire
   p.track.stop();
 
   const blob = new Blob(chunks, { type: isWebm ? 'video/webm' : 'video/mp4' });

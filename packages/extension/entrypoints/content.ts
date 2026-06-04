@@ -6,6 +6,7 @@ import {
 import { isMessage } from '../src/messages';
 
 let lastPlan: { totalFrames: number; offsetForFrame: (i: number) => number } | null = null;
+let driveAborted = false;
 
 export default defineContentScript({
   matches: ['http://*/*', 'https://*/*'],
@@ -20,7 +21,9 @@ export default defineContentScript({
     });
     // capture:start → run the wall-clock scroll
     browser.runtime.onMessage.addListener((raw) => {
-      if (isMessage(raw) && raw.type === 'capture:start' && lastPlan) void drive(raw.fps, lastPlan);
+      if (!isMessage(raw)) return;
+      if (raw.type === 'capture:start' && lastPlan) void drive(raw.fps, lastPlan);
+      else if (raw.type === 'abort') driveAborted = true;
     });
   },
 });
@@ -50,17 +53,18 @@ async function prepareAndReportPlan(fps: number, rawOptions: unknown) {
     ...(stops ? { stops } : {}),
   });
   lastPlan = { totalFrames: plan.totalFrames, offsetForFrame: plan.offsetForFrame };
-  return { totalFrames: plan.totalFrames, width: window.innerWidth, height: viewportHeight };
+  const dpr = Math.min(window.devicePixelRatio || 1, 2); // capture at native px (capped 2×) → crisp text
+  return { totalFrames: plan.totalFrames, width: Math.round(window.innerWidth * dpr), height: Math.round(viewportHeight * dpr) };
 }
 
 async function drive(fps: number, plan: { totalFrames: number; offsetForFrame: (i: number) => number }) {
+  driveAborted = false;
   window.scrollTo(0, 0);
   await new Promise((r) => requestAnimationFrame(() => r(undefined)));
   const t0 = performance.now();
-  let aborted = false;
   const onVisibility = () => {
-    if (document.visibilityState === 'hidden' && !aborted) {
-      aborted = true;
+    if (document.visibilityState === 'hidden' && !driveAborted) {
+      driveAborted = true;
       browser.runtime.sendMessage({ type: 'abort' }).catch(() => {});
       console.warn('page-capture: tab left foreground — capture aborted');
     }
@@ -69,7 +73,7 @@ async function drive(fps: number, plan: { totalFrames: number; offsetForFrame: (
   try {
     await new Promise<void>((resolve) => {
       const tick = () => {
-        if (aborted) { resolve(); return; }
+        if (driveAborted) { resolve(); return; }
         const frame = frameAtElapsed(performance.now() - t0, fps, plan.totalFrames);
         window.scrollTo(0, plan.offsetForFrame(frame));
         browser.runtime.sendMessage({ type: 'drive:progress', frame, totalFrames: plan.totalFrames }).catch(() => {});
@@ -81,5 +85,5 @@ async function drive(fps: number, plan: { totalFrames: number; offsetForFrame: (
   } finally {
     document.removeEventListener('visibilitychange', onVisibility);
   }
-  if (!aborted) browser.runtime.sendMessage({ type: 'drive:done' }).catch(() => {});
+  if (!driveAborted) browser.runtime.sendMessage({ type: 'drive:done' }).catch(() => {});
 }
