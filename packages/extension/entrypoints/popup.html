@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Page Capture</title>
+    <style>
+      body { font: 13px system-ui; width: 260px; padding: 12px; }
+      label { display: block; margin: 6px 0; }
+      input, select { width: 100%; }
+      #go { margin-top: 10px; width: 100%; padding: 6px; }
+      #status { margin-top: 8px; color: #555; min-height: 1em; }
+    </style>
+  </head>
+  <body>
+    <label>Style
+      <select id="style"><option value="reading">reading</option><option value="continuous">continuous</option></select>
+    </label>
+    <label>FPS
+      <select id="fps"><option>30</option><option>60</option></select>
+    </label>
+    <label><input type="checkbox" id="roundTrip" /> round trip</label>
+    <button id="go">Record this tab</button>
+    <div id="status"></div>
+    <script type="module" src="../src/popup.ts"></script>
+  </body>
+</html>
