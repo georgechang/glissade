@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>page-capture E2E fixture</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.5 system-ui, sans-serif; color: #111; }
+  header, section, footer { padding: 48px 8vw; }
+  header { height: 90vh; display: flex; flex-direction: column; justify-content: center;
+           background: linear-gradient(135deg, #1e3a8a, #0ea5e9); color: #fff; }
+  h1 { font-size: 48px; margin: 0 0 8px; }
+  section { min-height: 90vh; border-bottom: 1px solid #e5e7eb; }
+  .reveal { opacity: 0; transform: translateY(40px); transition: opacity .8s ease, transform .8s ease; }
+  .reveal.in { opacity: 1; transform: none; }
+  .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; background: #fef08a; font-weight: 600; color: #111; }
+  canvas, video { display: block; width: 100%; max-width: 720px; height: 260px; border-radius: 12px; background: #000; }
+  footer { background: #111; color: #fff; height: 60vh; display: flex; align-items: center; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="badge">page-capture E2E</div>
+    <h1>Scroll capture fixture</h1>
+    <p>CSS reveals · 2D canvas · WebGL · live &lt;video&gt;. Scroll to the bottom.</p>
+  </header>
+
+  <section><h2 class="reveal">① CSS reveal A</h2><p class="reveal">This fades + slides in when scrolled into view (IntersectionObserver, once).</p></section>
+  <section><h2 class="reveal">② 2D canvas animation</h2><canvas id="c2d" width="720" height="260"></canvas><p class="reveal">Continuously animating 2D canvas — should move smoothly in the capture.</p></section>
+  <section><h2 class="reveal">③ WebGL animation</h2><canvas id="cgl" width="720" height="260"></canvas><p class="reveal">WebGL canvas cycling colour — tests GPU compositing.</p></section>
+  <section><h2 class="reveal">④ Live &lt;video&gt;</h2><video id="vid" autoplay muted playsinline loop></video><p class="reveal">A &lt;video&gt; element playing a live canvas-generated stream (self-contained, non-DRM).</p></section>
+  <section><h2 class="reveal">⑤ CSS reveal B</h2><p class="reveal">Another reveal near the end.</p></section>
+  <footer><h2 class="reveal">⑥ Footer — end of page</h2></footer>
+
+  <canvas id="vsrc" width="640" height="360" style="display:none"></canvas>
+  <script>
+    // Scroll reveals (once)
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+    }, { threshold: 0.2 });
+    document.querySelectorAll('.reveal').forEach((el) => io.observe(el));
+
+    // 2D canvas animation
+    (function () {
+      const cv = document.getElementById('c2d'), x = cv.getContext('2d'); let t = 0;
+      (function loop() {
+        t += 0.03;
+        x.fillStyle = '#0b1020'; x.fillRect(0, 0, cv.width, cv.height);
+        for (let i = 0; i < 6; i++) {
+          const px = cv.width / 2 + Math.cos(t + i) * 200, py = cv.height / 2 + Math.sin(t * 1.3 + i) * 90;
+          x.fillStyle = `hsl(${(t * 60 + i * 60) % 360}, 80%, 60%)`;
+          x.beginPath(); x.arc(px, py, 24, 0, 7); x.fill();
+        }
+        requestAnimationFrame(loop);
+      })();
+    })();
+
+    // WebGL clear-colour cycle
+    (function () {
+      const c = document.getElementById('cgl'), gl = c.getContext('webgl');
+      if (!gl) { c.replaceWith(Object.assign(document.createElement('div'), { textContent: 'WebGL unavailable' })); return; }
+      let t = 0;
+      (function loop() {
+        t += 0.02;
+        gl.clearColor(0.5 + 0.5 * Math.sin(t), 0.5 + 0.5 * Math.sin(t + 2), 0.5 + 0.5 * Math.sin(t + 4), 1);
+        gl.clear(gl.COLOR_BUFFER_BIT); requestAnimationFrame(loop);
+      })();
+    })();
+
+    // Live <video> fed by a canvas MediaStream (self-contained: real HTMLVideoElement, no file/codec/DRM)
+    (function () {
+      const cv = document.getElementById('vsrc'), x = cv.getContext('2d'); let t = 0;
+      (function loop() {
+        t += 1;
+        x.fillStyle = '#111'; x.fillRect(0, 0, cv.width, cv.height);
+        x.fillStyle = '#22d3ee'; x.fillRect((t * 3) % cv.width, 0, 80, cv.height);
+        x.fillStyle = '#fff'; x.font = '28px system-ui'; x.fillText('LIVE VIDEO ' + t, 20, 60);
+        requestAnimationFrame(loop);
+      })();
+      const v = document.getElementById('vid');
+      if (cv.captureStream) { v.srcObject = cv.captureStream(30); const pl = v.play(); if (pl && pl.catch) pl.catch(() => {}); }
+    })();
+  </script>
+</body>
+</html>
