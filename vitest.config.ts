@@ -10,6 +10,7 @@ export default defineConfig({
     alias: {
       '@page-capture/shared': r('./packages/shared/src/index.ts'),
       '@page-capture/scroll-engine': r('./packages/scroll-engine/src/index.ts'),
+      '@page-capture/extension': r('./packages/extension/src/index.ts'),
     },
   },
   test: {
