@@ -10,7 +10,8 @@
   "workspaces": [
     "packages/shared",
     "packages/core",
-    "packages/cli"
+    "packages/cli",
+    "packages/scroll-engine"
   ],
   "scripts": {
     "build": "npm run build --workspace=@page-capture/shared --workspace=@page-capture/core --workspace=@page-capture/cli --if-present",

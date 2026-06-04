@@ -9,7 +9,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@page-capture/shared': r('./packages/shared/src/index.ts'),
-      '@page-capture/core': r('./packages/core/src/index.ts'),
+      '@page-capture/scroll-engine': r('./packages/scroll-engine/src/index.ts'),
     },
   },
   test: {
