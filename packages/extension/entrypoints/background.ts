@@ -24,6 +24,7 @@ export default defineBackground(() => {
 async function start(options: unknown): Promise<void> {
   const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) throw new Error('no active tab');
+  await browser.tabs.setZoom(tab.id, 1).catch(() => undefined); // normalize zoom → crisp 1:1 capture
   const fps = readFps(options);
 
   // tabCapture stream id for THIS tab (activeTab granted via the toolbar action that opened the popup).

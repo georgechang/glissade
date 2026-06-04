@@ -24,3 +24,10 @@ $('go').addEventListener('click', async () => {
     { ok: boolean; error?: string } | undefined;
   if (!res?.ok) status.textContent = `Error: ${res?.error ?? 'unknown'}`;
 });
+
+$('fps').addEventListener('change', () => {
+  status.textContent =
+    ($('fps') as HTMLSelectElement).value === '60'
+      ? '60fps needs a 60Hz+ display; otherwise it records smooth ~30.'
+      : '';
+});
