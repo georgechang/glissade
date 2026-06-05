@@ -23,12 +23,15 @@ export type Msg =
   | { type: 'capture:progress'; frame: number }
   // background → popup: total frame count for progress display
   | { type: 'progress:total'; totalFrames: number }
-  | { type: 'abort' };
+  // background → popup: human-readable pipeline phase (reloading / waiting / recording / encoding / saving)
+  | { type: 'capture:phase'; phase: string }
+  // abort can carry a reason so the outcome reads meaningfully (cancel vs lost-focus)
+  | { type: 'abort'; reason?: string };
 
 const TYPES = new Set<Msg['type']>([
   'ui:start', 'drive:start', 'capture:acquire', 'capture:go', 'capture:bound', 'scroll:start',
   'page:firstPaint', 'drive:done', 'drive:progress',
-  'capture:done', 'capture:progress', 'progress:total', 'abort',
+  'capture:done', 'capture:progress', 'progress:total', 'capture:phase', 'abort',
 ]);
 
 export function isMessage(x: unknown): x is Msg {

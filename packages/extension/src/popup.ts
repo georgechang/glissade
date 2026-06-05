@@ -28,7 +28,7 @@ const EASING_LABELS: Record<string, string> = {
   linear: 'Linear',
   easeIn: 'Ease in',
   easeOut: 'Ease out',
-  easeInOut: 'Ease in-out (default)',
+  easeInOut: 'Ease in-out',
   easeInOutSine: 'Smooth (sine)',
   smoothstep: 'Smoothstep',
 };
@@ -247,11 +247,13 @@ go.addEventListener('click', () => {
 const tip = document.createElement('div');
 tip.id = 'tip';
 document.body.append(tip);
+let tipActiveEl: HTMLElement | null = null;
 function showTip(el: HTMLElement): void {
   const text = el.dataset.tip;
   if (!text) return;
   tip.textContent = text;
   tip.style.display = 'block';
+  tipActiveEl = el;
   const r = el.getBoundingClientRect();
   const vw = document.documentElement.clientWidth;
   const vh = document.documentElement.clientHeight;
@@ -262,10 +264,15 @@ function showTip(el: HTMLElement): void {
   tip.style.left = `${Math.round(left)}px`;
   tip.style.top = `${Math.round(top)}px`;
 }
-const hideTip = (): void => { tip.style.display = 'none'; };
+const hideTip = (): void => { tip.style.display = 'none'; tipActiveEl = null; };
 for (const el of document.querySelectorAll<HTMLElement>('[data-tip]')) {
+  el.setAttribute('aria-label', el.dataset.tip ?? 'More info');
   el.addEventListener('mouseenter', () => showTip(el));
   el.addEventListener('mouseleave', hideTip);
   el.addEventListener('focus', () => showTip(el));
   el.addEventListener('blur', hideTip);
+  el.addEventListener('click', () => {
+    if (tipActiveEl === el) { hideTip(); } else { showTip(el); }
+  });
 }
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideTip(); });
