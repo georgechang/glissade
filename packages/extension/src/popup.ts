@@ -13,6 +13,8 @@ const easingSel = $('easing') as HTMLSelectElement;
 const go = $('go') as HTMLButtonElement;
 const loadedView = $('loadedView') as HTMLDetailsElement;
 const loadedJson = $('loadedJson') as HTMLPreElement;
+const pppHint = $('pppHint') as HTMLSpanElement;
+const clearPreset = $('clearPreset') as HTMLButtonElement;
 
 let stops: ScrollStop[] | undefined;
 let recording = false;
@@ -61,20 +63,38 @@ async function currentPageKey(): Promise<string | null> {
   }
 }
 
+const pointWord = (n: number): string => `${n} point${n === 1 ? '' : 's'}`;
+
 function applyPreset(preset: NormalizedPreset, note: string): void {
   stops = preset.stops;
   if (preset.profile) { profileSel.value = preset.profile; applyProfile(preset.profile); }
+  const n = stops?.length ?? 0;
   presetInfo.textContent =
-    `${note}${preset.name ? ` "${preset.name}"` : ''}: ${stops?.length ?? 0} stops` +
+    `${note}${preset.name ? ` "${preset.name}"` : ''}: ${pointWord(n)}` +
     (preset.profile ? `, ${preset.profile} profile` : '');
-  if (stops && stops.length) {
-    // one stop per line (compact, matches the example format) rather than fully-expanded JSON
+  pppHint.textContent = n > 0 ? `${pointWord(n)} loaded` : 'optional';
+  clearPreset.hidden = n === 0;
+  if (n > 0 && stops) {
+    // one point per line (compact, matches the example format) rather than fully-expanded JSON
     loadedJson.textContent = `[\n${stops.map((s) => `  ${JSON.stringify(s)}`).join(',\n')}\n]`;
     loadedView.hidden = false;
   } else {
     loadedView.hidden = true;
   }
 }
+
+async function clearLoadedPoints(): Promise<void> {
+  stops = undefined;
+  presetInfo.textContent = '';
+  pppHint.textContent = 'optional';
+  clearPreset.hidden = true;
+  loadedView.hidden = true;
+  loadedView.open = false;
+  ($('preset') as HTMLInputElement).value = ''; // allow re-selecting the same file
+  const key = await currentPageKey();
+  if (key) await browser.storage.local.remove(key); // don't auto-restore it next time
+}
+clearPreset.addEventListener('click', () => { void clearLoadedPoints(); });
 
 async function savePresetForPage(preset: NormalizedPreset): Promise<void> {
   const key = await currentPageKey();
@@ -87,7 +107,7 @@ void (async () => {
   if (!key) return;
   const got = await browser.storage.local.get(key);
   const cached = got[key] as NormalizedPreset | undefined;
-  if (cached && (cached.stops?.length || cached.profile)) applyPreset(cached, 'Reusing saved preset');
+  if (cached && (cached.stops?.length || cached.profile)) applyPreset(cached, 'Reusing saved');
 })();
 
 $('preset').addEventListener('change', async (ev) => {
@@ -97,10 +117,13 @@ $('preset').addEventListener('change', async (ev) => {
     const preset = normalizePreset(JSON.parse(await file.text()));
     applyPreset(preset, 'Loaded');
     void savePresetForPage(preset); // cache it for next time on this page
+    ($('ppp') as HTMLDetailsElement).open = true; // surface what was just loaded
   } catch (e) {
     stops = undefined;
     loadedView.hidden = true;
-    presetInfo.textContent = `Invalid preset: ${(e as Error).message}`;
+    clearPreset.hidden = true;
+    pppHint.textContent = 'optional';
+    presetInfo.textContent = `Invalid file: ${(e as Error).message}`;
   }
 });
 

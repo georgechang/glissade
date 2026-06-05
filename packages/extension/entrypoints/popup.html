@@ -97,7 +97,13 @@
         background: var(--surface); color: var(--muted); font-size: 12.5px; transition: border-color .12s, color .12s;
       }
       .file:hover .file-btn { border-color: var(--accent); color: var(--fg); }
-      #presetInfo { margin-top: 6px; }
+      .preset-status { display: flex; align-items: baseline; gap: 10px; margin-top: 6px; }
+      #presetInfo { flex: 1; min-width: 0; }
+      .link-btn {
+        border: 0; background: none; padding: 0; flex: none; font: inherit; font-size: 11px;
+        color: var(--muted); cursor: pointer; text-decoration: underline;
+      }
+      .link-btn:hover { color: var(--danger); }
 
       /* Advanced = a neutral control card */
       details.disc { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); overflow: hidden; margin-bottom: 13px; }
@@ -195,34 +201,37 @@
       </div>
     </div>
 
-    <div class="field">
-      <span class="lbl">Preset <span class="hint">&nbsp;optional · pause points</span>
-        <span class="info" tabindex="0" data-tip="Optional JSON of pause points the scroll should stop at (reading style). Saved per page and reused next time. See ‘Show example format’ below.">i</span>
-      </span>
-      <label class="file">
-        <input type="file" id="preset" accept=".json,application/json" />
-        <span class="file-btn">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4" /><path d="M7 9l5-5 5 5" /><path d="M5 20h14" /></svg>
-          Choose a .json preset…
-        </span>
-      </label>
-      <div id="presetInfo" class="hint"></div>
-      <details class="ex" id="loadedView" hidden>
-        <summary>View loaded preset</summary>
-        <div class="ex-body"><pre class="example" id="loadedJson"></pre></div>
-      </details>
-      <details class="ex">
-        <summary>Show example format</summary>
-        <div class="ex-body">
+    <details class="disc" id="ppp">
+      <summary><span>Page pause points <span class="hint" id="pppHint">optional</span></span></summary>
+      <div class="disc-body">
+        <label class="file">
+          <input type="file" id="preset" accept=".json,application/json" />
+          <span class="file-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4" /><path d="M7 9l5-5 5 5" /><path d="M5 20h14" /></svg>
+            Choose a .json file…
+          </span>
+        </label>
+        <div class="preset-status">
+          <span id="presetInfo" class="hint"></span>
+          <button type="button" id="clearPreset" class="link-btn" hidden>Remove</button>
+        </div>
+        <details class="ex" id="loadedView" hidden>
+          <summary>View loaded points</summary>
+          <div class="ex-body"><pre class="example" id="loadedJson"></pre></div>
+        </details>
+        <details class="ex">
+          <summary>Show example format</summary>
+          <div class="ex-body">
 <pre class="example">[
   { "selector": "#hero", "holdMs": 2000 },
   { "percent": 40 },
   { "offset": 1200 }
 ]</pre>
-          <p class="example-note">An array of pause points — each with a CSS <code>selector</code>, a <code>percent</code> (0–100) of the page, or a pixel <code>offset</code>; optional <code>holdMs</code> dwell. Also accepts <code>{ "name", "profile", "stops": [...] }</code>.</p>
-        </div>
-      </details>
-    </div>
+            <p class="example-note">An array of pause points — each scrolled to the top of the screen and held. Give a CSS <code>selector</code>, a <code>percent</code> (0–100) of the page, or a pixel <code>offset</code>; optional <code>holdMs</code> dwell. Also accepts <code>{ "name", "profile", "stops": [...] }</code>.</p>
+          </div>
+        </details>
+      </div>
+    </details>
 
     <details class="disc" id="adv">
       <summary>Advanced</summary>
