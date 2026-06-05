@@ -18,7 +18,6 @@
         --accent-fg: #ffffff;
         --danger: #dc2626;
         --radius: 9px;
-        --caret: "%236b7280";
       }
       @media (prefers-color-scheme: dark) {
         :root {
@@ -31,23 +30,17 @@
           --surface: #222329;
           --accent: #6366f1;
           --accent-hi: #818cf8;
-          --caret: "%239aa0aa";
         }
       }
       * { box-sizing: border-box; }
       body {
-        margin: 0;
-        width: 344px;
-        padding: 16px;
+        margin: 0; width: 344px; padding: 16px;
         font: 13px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-        color: var(--fg);
-        background: var(--bg);
-        -webkit-font-smoothing: antialiased;
+        color: var(--fg); background: var(--bg); -webkit-font-smoothing: antialiased;
       }
       header { display: flex; align-items: center; gap: 11px; margin-bottom: 16px; }
       .logo {
-        width: 30px; height: 30px; border-radius: 9px; flex: none;
-        display: grid; place-items: center; color: #fff;
+        width: 30px; height: 30px; border-radius: 9px; flex: none; display: grid; place-items: center; color: #fff;
         background: linear-gradient(140deg, var(--accent-hi), #a855f7);
         box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 35%, transparent);
       }
@@ -58,14 +51,14 @@
       .row { display: flex; gap: 11px; }
       .row > .field { flex: 1; margin-bottom: 13px; }
       .lbl {
-        display: block; font-size: 10.5px; font-weight: 600; color: var(--muted);
-        text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;
+        display: flex; align-items: center; white-space: nowrap; font-size: 10.5px; font-weight: 600;
+        color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 6px;
       }
 
       select, input[type="number"] {
         width: 100%; height: 34px; padding: 0 11px; font: inherit; color: var(--fg);
-        background: var(--field-bg); border: 1px solid var(--field-border);
-        border-radius: var(--radius); appearance: none; outline: none; transition: border-color .12s, box-shadow .12s;
+        background: var(--field-bg); border: 1px solid var(--field-border); border-radius: var(--radius);
+        appearance: none; outline: none; transition: border-color .12s, box-shadow .12s;
       }
       select {
         cursor: pointer; padding-right: 30px;
@@ -73,12 +66,27 @@
         background-repeat: no-repeat; background-position: right 10px center;
       }
       select:focus, input[type="number"]:focus {
-        border-color: var(--accent);
-        box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+        border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
       }
 
       .check { display: flex; align-items: center; gap: 8px; height: 34px; font-size: 13px; cursor: pointer; user-select: none; }
       .check input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+      .check-row { display: flex; align-items: center; gap: 8px; }
+      .check-row .check { height: 30px; }
+
+      /* info icon + shared JS-positioned tooltip */
+      .info {
+        display: inline-grid; place-items: center; width: 14px; height: 14px; flex: none; margin-left: 5px;
+        border-radius: 50%; border: 1.2px solid currentColor; color: var(--muted); opacity: .85;
+        font: italic 700 9px/1 Georgia, "Times New Roman", serif; text-transform: none; cursor: help;
+      }
+      .info:hover, .info:focus-visible { color: var(--accent); opacity: 1; outline: none; }
+      #tip {
+        position: fixed; z-index: 50; max-width: 226px; padding: 8px 11px; border-radius: 8px;
+        background: var(--fg); color: var(--bg); font: 11px/1.45 system-ui, sans-serif;
+        text-transform: none; letter-spacing: 0; box-shadow: 0 6px 22px rgba(0, 0, 0, .28);
+        display: none; pointer-events: none;
+      }
 
       /* file picker styled as a dashed drop button (real <input> overlaid, keeps #preset) */
       .file { position: relative; display: block; }
@@ -91,10 +99,8 @@
       .file:hover .file-btn { border-color: var(--accent); color: var(--fg); }
       #presetInfo { margin-top: 6px; }
 
-      details.disc {
-        border: 1px solid var(--border); border-radius: var(--radius);
-        background: var(--surface); overflow: hidden; margin-bottom: 13px;
-      }
+      /* Advanced = a neutral control card */
+      details.disc { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); overflow: hidden; margin-bottom: 13px; }
       details.disc > summary {
         list-style: none; cursor: pointer; padding: 10px 12px; font-weight: 600; font-size: 12px;
         display: flex; align-items: center; justify-content: space-between; color: var(--fg);
@@ -109,23 +115,37 @@
       .disc-body { padding: 12px; }
       .disc-body .row:last-child, .disc-body .field:last-child { margin-bottom: 0; }
 
+      /* Example / loaded-preset = a lightweight inline hint (accent text-link + tinted code callout),
+         deliberately NOT styled like the neutral Advanced card. */
+      details.ex { margin-top: 9px; }
+      details.ex > summary {
+        list-style: none; cursor: pointer; width: fit-content; display: inline-flex; align-items: center; gap: 6px;
+        font-size: 11.5px; font-weight: 500; color: var(--accent);
+      }
+      details.ex > summary::-webkit-details-marker { display: none; }
+      details.ex > summary::before {
+        content: ""; width: 6px; height: 6px; border-right: 1.6px solid currentColor; border-bottom: 1.6px solid currentColor;
+        transform: rotate(-45deg); transition: transform .15s;
+      }
+      details.ex[open] > summary::before { transform: rotate(45deg); }
+      details.ex > summary:hover { text-decoration: underline; }
+      .ex-body { margin-top: 8px; }
       pre.example {
         margin: 0; padding: 10px 11px; font: 10.5px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
-        color: var(--fg); background: var(--bg); border: 1px solid var(--border); border-radius: 7px;
-        white-space: pre; overflow-x: auto;
+        color: var(--fg); border-radius: 7px; white-space: pre; overflow: auto; max-height: 168px;
+        background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+        border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
       }
-      .example-note code { font: 10.5px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--fg); }
       .example-note { margin: 9px 0 0; font-size: 11px; color: var(--muted); }
+      .example-note code { font: 10.5px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--fg); }
 
       #go {
         width: 100%; height: 42px; margin-top: 4px; border: 0; border-radius: var(--radius);
-        font: inherit; font-weight: 650; font-size: 14px; color: var(--accent-fg);
-        background: var(--accent); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+        font: inherit; font-weight: 650; font-size: 14px; color: var(--accent-fg); background: var(--accent);
+        cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
         transition: filter .12s, transform .05s, background .12s;
       }
-      #go::before {
-        content: ""; width: 9px; height: 9px; border-radius: 50%; background: currentColor;
-      }
+      #go::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
       #go:hover { filter: brightness(1.08); }
       #go:active { transform: translateY(1px); }
       #go.danger { background: var(--danger); }
@@ -149,7 +169,9 @@
     </header>
 
     <div class="field">
-      <span class="lbl">Profile</span>
+      <span class="lbl">Profile
+        <span class="info" tabindex="0" data-tip="Slow / Medium / Fast preset all the timings below (dwell + scroll speed). Pick Custom, or edit any Advanced value, to use your own.">i</span>
+      </span>
       <select id="profile">
         <option value="slow">Slow</option>
         <option value="medium" selected>Medium</option>
@@ -160,17 +182,23 @@
 
     <div class="row">
       <div class="field">
-        <span class="lbl">Style</span>
+        <span class="lbl">Style
+          <span class="info" tabindex="0" data-tip="Reading scrolls one screen, pauses to ‘read’, then continues — like a person reading down the page. Continuous is one smooth glide from top to bottom.">i</span>
+        </span>
         <select id="style"><option value="reading">reading</option><option value="continuous">continuous</option></select>
       </div>
       <div class="field">
-        <span class="lbl">Direction</span>
+        <span class="lbl">Direction
+          <span class="info" tabindex="0" data-tip="Round trip: after reaching the bottom, scroll back up to the top before finishing the recording.">i</span>
+        </span>
         <label class="check"><input type="checkbox" id="roundTrip" /> round trip</label>
       </div>
     </div>
 
     <div class="field">
-      <span class="lbl">Preset <span class="hint">optional · pause points</span></span>
+      <span class="lbl">Preset <span class="hint">&nbsp;optional · pause points</span>
+        <span class="info" tabindex="0" data-tip="Optional JSON of pause points the scroll should stop at (reading style). Saved per page and reused next time. See ‘Show example format’ below.">i</span>
+      </span>
       <label class="file">
         <input type="file" id="preset" accept=".json,application/json" />
         <span class="file-btn">
@@ -179,9 +207,13 @@
         </span>
       </label>
       <div id="presetInfo" class="hint"></div>
-      <details class="disc" style="margin-top: 10px;">
-        <summary>Example preset</summary>
-        <div class="disc-body">
+      <details class="ex" id="loadedView" hidden>
+        <summary>View loaded preset</summary>
+        <div class="ex-body"><pre class="example" id="loadedJson"></pre></div>
+      </details>
+      <details class="ex">
+        <summary>Show example format</summary>
+        <div class="ex-body">
 <pre class="example">[
   { "selector": "#hero", "holdMs": 2000 },
   { "percent": 40 },
@@ -196,23 +228,50 @@
       <summary>Advanced</summary>
       <div class="disc-body">
         <div class="row">
-          <div class="field"><span class="lbl">FPS</span><select id="fps"><option>30</option><option>60</option></select></div>
-          <div class="field"><span class="lbl">Easing</span><select id="easing"></select></div>
+          <div class="field">
+            <span class="lbl">FPS <span class="info" tabindex="0" data-tip="Frames per second of the output video. 60 is smoother but needs a 60 Hz+ display and more CPU; 30 is a safe default.">i</span></span>
+            <select id="fps"><option>30</option><option>60</option></select>
+          </div>
+          <div class="field">
+            <span class="lbl">Easing <span class="info" tabindex="0" data-tip="The acceleration curve of the scroll motion. easeInOut speeds up then slows down; linear is constant speed; smoothstep is gentle.">i</span></span>
+            <select id="easing"></select>
+          </div>
         </div>
         <div class="row">
-          <div class="field"><span class="lbl">Page hold (ms)</span><input type="number" id="pageHold" min="0" /></div>
-          <div class="field"><span class="lbl">Page scroll (ms)</span><input type="number" id="pageScroll" min="0" /></div>
+          <div class="field">
+            <span class="lbl">Page hold (ms) <span class="info" tabindex="0" data-tip="Reading style: how long to dwell on each screen — and at the top before the first scroll — in milliseconds.">i</span></span>
+            <input type="number" id="pageHold" min="0" />
+          </div>
+          <div class="field">
+            <span class="lbl">Page scroll (ms) <span class="info" tabindex="0" data-tip="Reading style: the glide time between one screen and the next, in milliseconds. Lower = faster scrolling.">i</span></span>
+            <input type="number" id="pageScroll" min="0" />
+          </div>
         </div>
         <div class="row">
-          <div class="field"><span class="lbl">Velocity (vh/s)</span><input type="number" id="velocity" min="0" step="0.01" /></div>
-          <div class="field"><span class="lbl">Max height (px)</span><input type="number" id="maxHeight" min="0" placeholder="auto" /></div>
+          <div class="field">
+            <span class="lbl">Velocity (vh/s) <span class="info" tabindex="0" data-tip="Continuous style: scroll speed in viewport-heights per second. Higher scrolls the page faster.">i</span></span>
+            <input type="number" id="velocity" min="0" step="0.01" />
+          </div>
+          <div class="field">
+            <span class="lbl">Max height (px) <span class="info" tabindex="0" data-tip="Cap how far down to scroll, for very tall or infinite-scroll pages. Leave blank to capture the whole page.">i</span></span>
+            <input type="number" id="maxHeight" min="0" placeholder="auto" />
+          </div>
         </div>
         <div class="row">
-          <div class="field"><span class="lbl">Hold start (ms)</span><input type="number" id="holdStart" min="0" /></div>
-          <div class="field"><span class="lbl">Hold end (ms)</span><input type="number" id="holdEnd" min="0" /></div>
+          <div class="field">
+            <span class="lbl">Hold end (ms) <span class="info" tabindex="0" data-tip="How long to hold still at the bottom of the page after the scroll finishes, in milliseconds.">i</span></span>
+            <input type="number" id="holdEnd" min="0" />
+          </div>
+          <div class="field"></div>
         </div>
-        <label class="check"><input type="checkbox" id="hideFixed" /> hide fixed / sticky elements</label>
-        <label class="check"><input type="checkbox" id="reload" checked /> reload page first</label>
+        <div class="check-row">
+          <label class="check"><input type="checkbox" id="hideFixed" /> hide fixed / sticky elements</label>
+          <span class="info" tabindex="0" data-tip="Hide fixed/sticky elements (floating headers, cookie bars, chat widgets) so they don’t cover content while scrolling.">i</span>
+        </div>
+        <div class="check-row">
+          <label class="check"><input type="checkbox" id="reload" checked /> reload page first</label>
+          <span class="info" tabindex="0" data-tip="Reload the page before recording so on-load / entrance animations replay and are captured from the very start.">i</span>
+        </div>
       </div>
     </details>
 

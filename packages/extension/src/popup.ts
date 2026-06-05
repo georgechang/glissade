@@ -11,6 +11,8 @@ const presetInfo = $('presetInfo') as HTMLDivElement;
 const profileSel = $('profile') as HTMLSelectElement;
 const easingSel = $('easing') as HTMLSelectElement;
 const go = $('go') as HTMLButtonElement;
+const loadedView = $('loadedView') as HTMLDetailsElement;
+const loadedJson = $('loadedJson') as HTMLPreElement;
 
 let stops: ScrollStop[] | undefined;
 let recording = false;
@@ -32,7 +34,6 @@ function applyProfile(name: ProfileName): void {
   setNum('pageHold', p.pageHoldMs);
   setNum('pageScroll', p.pageScrollMs);
   setNum('velocity', p.velocityVhPerSec);
-  setNum('holdStart', p.holdStartMs);
   setNum('holdEnd', p.holdEndMs);
 }
 
@@ -43,7 +44,7 @@ profileSel.addEventListener('change', () => {
   applyProfile(profileSel.value as ProfileName);
 });
 // Editing any timing field flips the profile to "custom"
-for (const id of ['pageHold', 'pageScroll', 'velocity', 'holdStart', 'holdEnd', 'easing']) {
+for (const id of ['pageHold', 'pageScroll', 'velocity', 'holdEnd', 'easing']) {
   $(id).addEventListener('input', () => { profileSel.value = 'custom'; });
 }
 
@@ -66,6 +67,13 @@ function applyPreset(preset: NormalizedPreset, note: string): void {
   presetInfo.textContent =
     `${note}${preset.name ? ` "${preset.name}"` : ''}: ${stops?.length ?? 0} stops` +
     (preset.profile ? `, ${preset.profile} profile` : '');
+  if (stops && stops.length) {
+    // one stop per line (compact, matches the example format) rather than fully-expanded JSON
+    loadedJson.textContent = `[\n${stops.map((s) => `  ${JSON.stringify(s)}`).join(',\n')}\n]`;
+    loadedView.hidden = false;
+  } else {
+    loadedView.hidden = true;
+  }
 }
 
 async function savePresetForPage(preset: NormalizedPreset): Promise<void> {
@@ -91,6 +99,7 @@ $('preset').addEventListener('change', async (ev) => {
     void savePresetForPage(preset); // cache it for next time on this page
   } catch (e) {
     stops = undefined;
+    loadedView.hidden = true;
     presetInfo.textContent = `Invalid preset: ${(e as Error).message}`;
   }
 });
@@ -127,7 +136,7 @@ go.addEventListener('click', () => {
     easing: easingSel.value,
     pageHoldMs: numVal('pageHold'),
     pageScrollMs: numVal('pageScroll'),
-    holds: { startMs: numVal('holdStart'), endMs: numVal('holdEnd') },
+    holds: { endMs: numVal('holdEnd') }, // top dwell uses pageHoldMs (see content.ts); startMs defaults
     hideFixed: ($('hideFixed') as HTMLInputElement).checked,
     reloadBeforeCapture: ($('reload') as HTMLInputElement).checked,
     ...(stops && stops.length ? { stops } : {}),
@@ -146,3 +155,30 @@ go.addEventListener('click', () => {
     () => { /* service worker async — ignore */ },
   );
 });
+
+// Info tooltips: one shared box, positioned next to the hovered icon and clamped to the popup.
+const tip = document.createElement('div');
+tip.id = 'tip';
+document.body.append(tip);
+function showTip(el: HTMLElement): void {
+  const text = el.dataset.tip;
+  if (!text) return;
+  tip.textContent = text;
+  tip.style.display = 'block';
+  const r = el.getBoundingClientRect();
+  const vw = document.documentElement.clientWidth;
+  const vh = document.documentElement.clientHeight;
+  let left = r.left + r.width / 2 - tip.offsetWidth / 2;
+  left = Math.max(6, Math.min(left, vw - tip.offsetWidth - 6));
+  let top = r.bottom + 6;
+  if (top + tip.offsetHeight > vh - 4) top = r.top - tip.offsetHeight - 6; // flip above if it would overflow
+  tip.style.left = `${Math.round(left)}px`;
+  tip.style.top = `${Math.round(top)}px`;
+}
+const hideTip = (): void => { tip.style.display = 'none'; };
+for (const el of document.querySelectorAll<HTMLElement>('[data-tip]')) {
+  el.addEventListener('mouseenter', () => showTip(el));
+  el.addEventListener('mouseleave', hideTip);
+  el.addEventListener('focus', () => showTip(el));
+  el.addEventListener('blur', hideTip);
+}
