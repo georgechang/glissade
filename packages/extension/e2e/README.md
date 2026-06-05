@@ -16,8 +16,8 @@ ideally on a ≥60 Hz display.
 
 ## Run
 3. Click the **Page Capture** toolbar button → the popup opens.
-4. Choose **reading** style, **30** fps → click **Record this tab**. Keep the tab focused for the whole scroll.
-5. A `page-capture.mp4` downloads when it finishes (the popup shows `Done (webcodecs-avc).`).
+4. Pick a **Profile** (Slow/Medium/Fast — auto-fills the Advanced timings), **Format** = MP4, **reading** style → click **Record this tab**. Keep the tab focused for the whole scroll.
+5. By default the page **reloads first** (so scroll animations re-arm) — let it finish loading; recording starts automatically after. A `page-capture.mp4` downloads when done (the popup shows `Done (webcodecs-avc).`).
 
 ## Verify the MP4
 - Opens and plays in **PowerPoint / Keynote / Google Slides / QuickTime**.
@@ -28,10 +28,17 @@ ideally on a ≥60 Hz display.
 - **Text is crisp** at 1080p.
 
 ## Also check
-6. Repeat at **60** fps (needs a ≥60 Hz display) — should still be smooth.
-7. Repeat on a real site (e.g. **hexagon.com**), foreground — confirm Cloudflare is a non-issue and reveals look natural.
-8. Switch tabs mid-capture once — the capture should **abort cleanly** (popup shows a failure), not hang or produce a frozen file.
-9. Note the reported encoder in the popup: `webcodecs-avc` expected on a capable machine; `mediarecorder-*` means the WebCodecs H.264 path was unavailable (fallback).
+6. Repeat at **60** fps (Advanced → FPS; needs a ≥60 Hz display) — should still be smooth.
+7. **GIF**: set Format = GIF, record again → downloads `page-capture.gif` (popup shows `Done (gif).`), downscaled (default 640px) at the GIF fps. Confirm it animates and is a reasonable size.
+8. **Profiles**: switch Profile → confirm the Advanced timing fields (page-hold/scroll/velocity/holds) update; editing any flips it to "Custom".
+9. **Preset upload**: pick a `.json` stop-config (e.g. the legacy `stop-configs/hexagoncom-home.json` — a bare `[{selector|offset|percent, holdMs?}]` array, or the extended `{name?,url?,profile?,stops}`). The popup shows "Loaded: N stops"; record on the matching site and confirm it pauses at those stops.
+10. **Reload toggle**: Advanced → uncheck "reload page first" → recording starts immediately on the current page state (no reload).
+11. Repeat on a real site (e.g. **hexagon.com**), foreground — confirm the reload completes, Cloudflare is a non-issue, and reveals look natural.
+12. Switch tabs mid-capture once — the capture should **abort cleanly** (popup shows a failure), not hang or produce a frozen file.
+13. Note the reported encoder in the popup: `webcodecs-avc` (MP4, capable machine) / `gif` / `mediarecorder-*` (WebCodecs H.264 unavailable → fallback).
+
+## What the reload-first flow does
+On Record, the extension grabs the tab-capture stream immediately (while the click's permission is fresh), then (unless disabled) reloads the tab and waits for it to finish loading before it starts encoding + scrolling — so the page re-initialises (scroll reveals re-arm) and the reload flash isn't in the video. **Runtime bet to confirm:** the capture stream must survive the reload; if it doesn't on your Chrome, the capture aborts with "capture track already ended" — tell me and I'll switch to acquiring after the reload.
 
 ## Known limitations (expected, not bugs)
 - ~60 fps is best-effort (auto-throttles under load; reclocked to CFR by duplicating frames).
