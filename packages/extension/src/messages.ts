@@ -20,9 +20,6 @@ export type Msg =
   // chrome.downloads, so it passes the blob URL + filename for the SW to save.
   | { type: 'capture:done'; ok: true; encoder: string; url: string; filename: string }
   | { type: 'capture:done'; ok: false; error: string }
-  | { type: 'capture:progress'; frame: number }
-  // background → popup: total frame count for progress display
-  | { type: 'progress:total'; totalFrames: number }
   // background → popup: human-readable pipeline phase (reloading / waiting / recording / encoding / saving)
   | { type: 'capture:phase'; phase: string }
   // abort can carry a reason so the outcome reads meaningfully (cancel vs lost-focus)
@@ -31,7 +28,7 @@ export type Msg =
 const TYPES = new Set<Msg['type']>([
   'ui:start', 'drive:start', 'capture:acquire', 'capture:go', 'capture:bound', 'scroll:start',
   'page:firstPaint', 'drive:done', 'drive:progress',
-  'capture:done', 'capture:progress', 'progress:total', 'capture:phase', 'abort',
+  'capture:done', 'capture:phase', 'abort',
 ]);
 
 export function isMessage(x: unknown): x is Msg {

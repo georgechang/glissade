@@ -211,7 +211,7 @@ go.addEventListener('click', () => {
   if (recording) {
     browser.runtime.sendMessage({ type: 'abort', reason: 'Recording cancelled.' }).catch(() => {});
     status.textContent = 'Cancelling…';
-    cancelTimer = setTimeout(() => { setRecording(false); status.textContent = 'Recording cancelled.'; }, 4000);
+    cancelTimer = setTimeout(() => { setRecording(false); status.textContent = 'Recording cancelled.'; browser.action.setBadgeText({ text: '' }).catch(() => {}); }, 4000);
     return;
   }
   const maxH = numVal('maxHeight');

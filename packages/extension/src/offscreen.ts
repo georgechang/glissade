@@ -8,6 +8,7 @@ let doneController = new AbortController();
 let held: { track: MediaStreamVideoTrack; fps: number } | null = null;
 const maxFramesRef = { current: 0 };
 let abortReason = '';
+let acquireError = '';
 
 browser.runtime.onMessage.addListener((raw, _sender, sendResponse) => {
   if (!isMessage(raw)) return;
@@ -31,16 +32,17 @@ async function acquire(m: Extract<Msg, { type: 'capture:acquire' }>): Promise<vo
   doneController = new AbortController();
   busy = false;
   held = null;
+  acquireError = '';
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: m.streamId, maxFrameRate: m.fps } } as MediaTrackConstraints,
     });
     const track = stream.getVideoTracks()[0] as MediaStreamVideoTrack;
-    track.addEventListener('ended', () => controller.abort());
+    track.addEventListener('ended', () => { if (!abortReason) abortReason = 'The captured tab was closed or the stream ended.'; controller.abort(); });
     held = { track, fps: m.fps };
   } catch (e) {
     held = null;
-    browser.runtime.sendMessage({ type: 'capture:done', ok: false, error: `capture: ${(e as Error).message}` } satisfies Msg).catch(() => {});
+    acquireError = (e as Error).message;
   }
 }
 
@@ -49,7 +51,7 @@ async function acquire(m: Extract<Msg, { type: 'capture:acquire' }>): Promise<vo
 async function go(): Promise<void> {
   if (busy) return;
   if (!held) {
-    browser.runtime.sendMessage({ type: 'capture:done', ok: false, error: 'no captured stream (acquire failed?)' } satisfies Msg).catch(() => {});
+    browser.runtime.sendMessage({ type: 'capture:done', ok: false, error: acquireError || 'Could not capture this tab.' } satisfies Msg).catch(() => {});
     return;
   }
   busy = true;
@@ -62,7 +64,6 @@ async function go(): Promise<void> {
     const params: EncodeParams = {
       track, fps,
       signal: controller.signal, done: doneController.signal,
-      onProgress: (frame) => browser.runtime.sendMessage({ type: 'capture:progress', frame } satisfies Msg).catch(() => {}),
       maxFramesRef,
     };
     const result: EncodeResult = await encodeTabStream(params);

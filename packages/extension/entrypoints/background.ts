@@ -94,12 +94,13 @@ export default defineBackground(() => {
       const slug = activeHost.replace(/[^a-z0-9]+/gi, '-').replace(/(^-|-$)/g, '').toLowerCase();
       const date = new Date().toISOString().slice(0, 10);
       const filename = `page-capture${slug ? `-${slug}` : ''}-${date}.${ext}`;
-      void browser.runtime.sendMessage({ type: 'capture:phase', phase: 'Saving…' } satisfies Msg).catch(() => {});
       browser.downloads.download({ url: raw.url, filename, saveAs: true }).catch(() => {});
       browser.notifications.create({ type: 'basic', iconUrl: icon, title: 'Page Capture', message: `Saved ${filename}` }).catch(() => {});
     } else {
       if (activeTabId !== undefined) browser.tabs.sendMessage(activeTabId, { type: 'abort' } satisfies Msg).catch(() => {});
-      browser.notifications.create({ type: 'basic', iconUrl: icon, title: 'Page Capture', message: `Capture failed: ${raw.error}` }).catch(() => {});
+      if (raw.error !== 'Recording cancelled.') {
+        browser.notifications.create({ type: 'basic', iconUrl: icon, title: 'Page Capture', message: `Capture failed: ${raw.error}` }).catch(() => {});
+      }
     }
   });
 });
@@ -111,6 +112,7 @@ async function start(options: unknown): Promise<void> {
 
   browser.action.setBadgeText({ text: 'REC' }).catch(() => {});
   browser.action.setBadgeBackgroundColor({ color: '#dc2626' }).catch(() => {});
+  setTimeout(() => browser.action.setBadgeText({ text: '' }).catch(() => {}), 10 * 60 * 1000);
 
   try { activeHost = new URL(tab.url ?? '').host.replace(/^www\./, ''); } catch { activeHost = ''; }
 
@@ -125,12 +127,14 @@ async function start(options: unknown): Promise<void> {
   await ensureOffscreen();
   await browser.runtime.sendMessage({ type: 'capture:acquire', streamId, fps } satisfies Msg);
 
-  // 2) Reload the tab so scroll-triggered animations re-arm.
+  // 2) Optionally reload the tab so scroll-triggered animations re-arm.
   const phase = (p: string) => { browser.runtime.sendMessage({ type: 'capture:phase', phase: p } satisfies Msg).catch(() => {}); };
-  phase('Reloading page…');
-  await browser.tabs.reload(tab.id);
-  // 3) Gate on the new page's first paint (Chrome Paint Holding has ended by now).
-  await awaitFirstPaint(tab.id);                                            // new page's first paint
+  if (opts.reloadBeforeCapture) {
+    phase('Reloading page…');
+    await browser.tabs.reload(tab.id);
+    // 3) Gate on the new page's first paint (Chrome Paint Holding has ended by now).
+    await awaitFirstPaint(tab.id);
+  }
   // 4) Start recording NOW — entrance/on-load animations are captured from here.
   await browser.runtime.sendMessage({ type: 'capture:go' } satisfies Msg);
   phase('Recording…');
@@ -144,7 +148,6 @@ async function start(options: unknown): Promise<void> {
   // 7) Tighten the encoder's runaway cap and tell the popup the total frame count.
   const maxFrames = plan.totalFrames + Math.ceil(15 * fps); // backstop only; drive:done is authoritative
   await browser.runtime.sendMessage({ type: 'capture:bound', maxFrames } satisfies Msg);
-  browser.runtime.sendMessage({ type: 'progress:total', totalFrames: plan.totalFrames } satisfies Msg).catch(() => {});
 
   // 8) Content holds the top for pageHoldMs (built into the plan) then scrolls.
   await sendToTab(tab.id, { type: 'scroll:start', fps } satisfies Msg);

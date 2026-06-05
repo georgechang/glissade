@@ -8,7 +8,6 @@ export interface EncodeParams {
   signal: AbortSignal;
   /** Aborted when the scroll has finished — the encoder then finalizes what it has. */
   done: AbortSignal;
-  onProgress?: (frame: number) => void;
   /** Dynamic cap updated by capture:bound messages; encoder respects the latest value. */
   maxFramesRef?: { current: number };
 }
@@ -95,7 +94,6 @@ export async function encodeTabStream(p: EncodeParams): Promise<EncodeResult> {
       const stamp = Math.max((performance.now() - t0) / 1000, lastStamp + slotMs / 4000); // real elapsed, strictly increasing
       lastStamp = stamp;
       await source.add(stamp, 1 / p.fps);
-      p.onProgress?.(n + 1);
     }
   } finally {
     reading = false;
