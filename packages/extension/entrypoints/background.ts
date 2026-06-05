@@ -44,15 +44,17 @@ async function awaitCompleteBounded(tabId: number, capMs: number): Promise<void>
     const t = await browser.tabs.get(tabId);
     if (t.status === 'complete') return;
   } catch { /* ignore */ }
+  let onUpdated: ((id: number, info: { status?: string }) => void) | undefined;
   await Promise.race([
     new Promise<void>((resolve) => {
-      const onUpdated = (id: number, info: { status?: string }) => {
-        if (id === tabId && info.status === 'complete') { browser.tabs.onUpdated.removeListener(onUpdated); resolve(); }
+      onUpdated = (id, info) => {
+        if (id === tabId && info.status === 'complete') resolve();
       };
       browser.tabs.onUpdated.addListener(onUpdated);
     }),
     new Promise<void>((r) => setTimeout(r, capMs)),
   ]);
+  if (onUpdated) browser.tabs.onUpdated.removeListener(onUpdated);
 }
 
 /** Send a message to the tab's content script, retrying briefly while it (re)injects. */
@@ -120,7 +122,7 @@ async function start(options: unknown): Promise<void> {
   // 7) Tighten the encoder's runaway cap and tell the popup the total frame count.
   const maxFrames = plan.totalFrames + Math.ceil(15 * fps); // backstop only; drive:done is authoritative
   await browser.runtime.sendMessage({ type: 'capture:bound', maxFrames } satisfies Msg);
-  await browser.runtime.sendMessage({ type: 'progress:total', totalFrames: plan.totalFrames } satisfies Msg);
+  browser.runtime.sendMessage({ type: 'progress:total', totalFrames: plan.totalFrames } satisfies Msg).catch(() => {});
 
   // 8) Content holds the top for pageHoldMs (built into the plan) then scrolls.
   await sendToTab(tab.id, { type: 'scroll:start', fps } satisfies Msg);

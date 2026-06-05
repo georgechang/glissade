@@ -73,7 +73,7 @@ export async function encodeTabStream(p: EncodeParams): Promise<EncodeResult> {
   })();
 
   const slotMs = 1000 / p.fps;
-  const FIXED_SAFETY = 180 * p.fps;
+  const FIXED_SAFETY = 600 * p.fps; // 20-min absolute backstop; drive:done + capture:bound are the real stops
   const t0 = performance.now();
   try {
     for (let n = 0; ; n++) {
