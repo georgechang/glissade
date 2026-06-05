@@ -10,7 +10,7 @@ describe('isMessage', () => {
   });
 
   it('accepts a capture:go message', () => {
-    const m: Msg = { type: 'capture:go', totalFrames: 90, width: 1920, height: 1080 };
+    const m: Msg = { type: 'capture:go' };
     expect(isMessage(m)).toBe(true);
   });
 });

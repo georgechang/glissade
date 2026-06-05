@@ -14,6 +14,7 @@ const go = $('go') as HTMLButtonElement;
 
 let stops: ScrollStop[] | undefined;
 let recording = false;
+let total = 0;
 
 const numVal = (id: string) => Number(($(id) as HTMLInputElement).value);
 const setNum = (id: string, v: number) => { ($(id) as HTMLInputElement).value = String(v); };
@@ -102,7 +103,8 @@ function setRecording(on: boolean): void {
 
 browser.runtime.onMessage.addListener((raw) => {
   if (!isMessage(raw)) return;
-  if (raw.type === 'capture:progress') status.textContent = `Encoding ${raw.frame}/${raw.totalFrames}…`;
+  if (raw.type === 'progress:total') total = raw.totalFrames;
+  if (raw.type === 'capture:progress') status.textContent = total > 0 ? `Encoding ${raw.frame}/${total}…` : `Encoding ${raw.frame}…`;
   if (raw.type === 'capture:done') {
     status.textContent = raw.ok ? `Done (${raw.encoder}).` : `Failed: ${raw.error}`;
     setRecording(false);
@@ -133,6 +135,7 @@ go.addEventListener('click', () => {
   };
   const parsed = CaptureOptionsSchema.safeParse(optionsInput);
   if (!parsed.success) { status.textContent = parsed.error.issues[0]?.message ?? 'invalid options'; return; }
+  total = 0;
   setRecording(true);
   status.textContent = 'Starting… keep this tab in front.';
   browser.runtime.sendMessage({ type: 'ui:start', options: parsed.data }).then(

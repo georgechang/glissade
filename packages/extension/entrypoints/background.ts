@@ -12,25 +12,47 @@ async function ensureOffscreen(): Promise<void> {
   });
 }
 
-/** Reload the tab and resolve once it has finished loading (+ a short settle so the
- *  freshly-injected content script is listening and fonts/lazy content have settled). */
-async function reloadAndWait(tabId: number): Promise<void> {
-  await new Promise<void>((resolve) => {
+/**
+ * Wait for the new page's first paint, signalled by a `page:firstPaint` message from
+ * the content script. Chrome "Paint Holding" keeps the OLD page's pixels on the
+ * captured surface until the new document's first paint — so recording must be gated
+ * on this event, not on document_start itself.
+ */
+function awaitFirstPaint(tabId: number, timeoutMs = 10_000): Promise<void> {
+  return new Promise((resolve, reject) => {
     let settled = false;
-    const finish = () => {
+    const finish = (err?: Error) => {
       if (settled) return;
       settled = true;
-      browser.tabs.onUpdated.removeListener(onUpdated);
-      resolve();
+      browser.runtime.onMessage.removeListener(onMsg);
+      err ? reject(err) : resolve();
     };
-    const onUpdated = (id: number, info: { status?: string }) => {
-      if (id === tabId && info.status === 'complete') finish();
+    const onMsg = (msg: unknown, sender: { tab?: { id?: number } }) => {
+      if (isMessage(msg) && msg.type === 'page:firstPaint' && sender?.tab?.id === tabId) finish();
     };
-    browser.tabs.onUpdated.addListener(onUpdated); // attach BEFORE reload to avoid missing 'complete'
-    setTimeout(finish, 30_000); // safety: never hang waiting for load
-    browser.tabs.reload(tabId).catch(finish);
+    browser.runtime.onMessage.addListener(onMsg);
+    setTimeout(() => finish(new Error('timed out waiting for page first paint')), timeoutMs);
   });
-  await new Promise((r) => setTimeout(r, 800));
+}
+
+/**
+ * Await the tab reaching 'complete', bounded by capMs so entrance animations aren't
+ * held hostage by a stalled load. If the tab is already complete, resolves immediately.
+ */
+async function awaitCompleteBounded(tabId: number, capMs: number): Promise<void> {
+  try {
+    const t = await browser.tabs.get(tabId);
+    if (t.status === 'complete') return;
+  } catch { /* ignore */ }
+  await Promise.race([
+    new Promise<void>((resolve) => {
+      const onUpdated = (id: number, info: { status?: string }) => {
+        if (id === tabId && info.status === 'complete') { browser.tabs.onUpdated.removeListener(onUpdated); resolve(); }
+      };
+      browser.tabs.onUpdated.addListener(onUpdated);
+    }),
+    new Promise<void>((r) => setTimeout(r, capMs)),
+  ]);
 }
 
 /** Send a message to the tab's content script, retrying briefly while it (re)injects. */
@@ -82,19 +104,24 @@ async function start(options: unknown): Promise<void> {
   await ensureOffscreen();
   await browser.runtime.sendMessage({ type: 'capture:acquire', streamId, fps } satisfies Msg);
 
-  // 2) Reload so scroll-triggered animations re-arm; wait for load (skippable).
-  if (opts.reloadBeforeCapture) await reloadAndWait(tab.id);
+  // 2) Reload the tab so scroll-triggered animations re-arm.
+  await browser.tabs.reload(tab.id);
+  // 3) Gate on the new page's first paint (Chrome Paint Holding has ended by now).
+  await awaitFirstPaint(tab.id);                                            // new page's first paint
+  // 4) Start recording NOW — entrance/on-load animations are captured from here.
+  await browser.runtime.sendMessage({ type: 'capture:go' } satisfies Msg);
+  // 5) Record entrance animations + load as the intro; cap so stalled load can't bloat it.
+  await awaitCompleteBounded(tab.id, 2500);
 
-  // 3) Content preps the freshly-loaded page and returns the measured plan.
+  // 6) Content preps DOM, measures plan, returns {totalFrames, width, height}.
   const plan = await sendToTab<{ totalFrames: number; width: number; height: number }>(
     tab.id, { type: 'drive:start', fps, options } satisfies Msg);
 
-  // 4) Offscreen encodes the held track…
-  await browser.runtime.sendMessage({
-    type: 'capture:go',
-    totalFrames: plan.totalFrames, width: plan.width, height: plan.height,
-  } satisfies Msg);
+  // 7) Tighten the encoder's runaway cap and tell the popup the total frame count.
+  const maxFrames = plan.totalFrames + Math.ceil(15 * fps); // backstop only; drive:done is authoritative
+  await browser.runtime.sendMessage({ type: 'capture:bound', maxFrames } satisfies Msg);
+  await browser.runtime.sendMessage({ type: 'progress:total', totalFrames: plan.totalFrames } satisfies Msg);
 
-  // 5) …and the content script scrolls.
+  // 8) Content holds the top for pageHoldMs (built into the plan) then scrolls.
   await sendToTab(tab.id, { type: 'scroll:start', fps } satisfies Msg);
 }

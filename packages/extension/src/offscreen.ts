@@ -6,18 +6,20 @@ let busy = false;
 let controller = new AbortController();
 let doneController = new AbortController();
 let held: { track: MediaStreamVideoTrack; fps: number } | null = null;
+const maxFramesRef = { current: 0 };
 
 browser.runtime.onMessage.addListener((raw, _sender, sendResponse) => {
   if (!isMessage(raw)) return;
   if (raw.type === 'abort') { controller.abort(); return; }
   if (raw.type === 'drive:done') { doneController.abort(); return; }
+  if (raw.type === 'capture:bound') { maxFramesRef.current = raw.maxFrames; return; }
   if (raw.type === 'capture:acquire') {
     // Ack only AFTER getUserMedia resolves so the background won't send capture:go
     // (which needs the held track) before the stream exists.
     void acquire(raw).then(() => sendResponse({}), () => sendResponse({}));
     return true; // keep the channel open for the async ack
   }
-  if (raw.type === 'capture:go') { void go(raw); return; }
+  if (raw.type === 'capture:go') { void go(); return; }
 });
 
 // Phase 1: grab the tab stream now (the streamId is freshest right after the user
@@ -41,8 +43,9 @@ async function acquire(m: Extract<Msg, { type: 'capture:acquire' }>): Promise<vo
   }
 }
 
-// Phase 2: encode the held track (the page has been reloaded + measured by now).
-async function go(m: Extract<Msg, { type: 'capture:go' }>): Promise<void> {
+// Phase 2: encode the held track starting from the new page's first paint.
+// Canvas dimensions are determined from the first captured frame.
+async function go(): Promise<void> {
   if (busy) return;
   if (!held) {
     browser.runtime.sendMessage({ type: 'capture:done', ok: false, error: 'no captured stream (acquire failed?)' } satisfies Msg).catch(() => {});
@@ -51,11 +54,14 @@ async function go(m: Extract<Msg, { type: 'capture:go' }>): Promise<void> {
   busy = true;
   const { track, fps } = held;
   held = null;
+  // Set a generous default cap; tightened later by capture:bound once the plan is known.
+  maxFramesRef.current = 180 * fps;
   try {
     const params: EncodeParams = {
-      track, width: m.width, height: m.height, fps, totalFrames: m.totalFrames,
+      track, fps,
       signal: controller.signal, done: doneController.signal,
-      onProgress: (frame) => browser.runtime.sendMessage({ type: 'capture:progress', frame, totalFrames: m.totalFrames } satisfies Msg).catch(() => {}),
+      onProgress: (frame) => browser.runtime.sendMessage({ type: 'capture:progress', frame } satisfies Msg).catch(() => {}),
+      maxFramesRef,
     };
     const result: EncodeResult = await encodeTabStream(params);
     const { buffer, encoder } = result;

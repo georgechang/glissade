@@ -5,10 +5,14 @@ export type Msg =
   | { type: 'drive:start'; fps: number; options: unknown }
   // background → offscreen: acquire the tab stream now (consume the fresh streamId), hold it
   | { type: 'capture:acquire'; streamId: string; fps: number }
-  // background → offscreen: encode the held track with these dims
-  | { type: 'capture:go'; totalFrames: number; width: number; height: number }
+  // background → offscreen: start encoding the held track (dimensions from first frame)
+  | { type: 'capture:go' }
+  // background → offscreen: tighten the runaway frame cap
+  | { type: 'capture:bound'; maxFrames: number }
   // background → content: begin the wall-clock scroll
   | { type: 'scroll:start'; fps: number }
+  // content → background: new page's first paint (Chrome Paint Holding has ended)
+  | { type: 'page:firstPaint' }
   // content → background
   | { type: 'drive:done' }
   | { type: 'drive:progress'; frame: number; totalFrames: number }
@@ -16,12 +20,15 @@ export type Msg =
   // chrome.downloads, so it passes the blob URL + filename for the SW to save.
   | { type: 'capture:done'; ok: true; encoder: string; url: string; filename: string }
   | { type: 'capture:done'; ok: false; error: string }
-  | { type: 'capture:progress'; frame: number; totalFrames: number }
+  | { type: 'capture:progress'; frame: number }
+  // background → popup: total frame count for progress display
+  | { type: 'progress:total'; totalFrames: number }
   | { type: 'abort' };
 
 const TYPES = new Set<Msg['type']>([
-  'ui:start', 'drive:start', 'capture:acquire', 'capture:go', 'scroll:start', 'drive:done', 'drive:progress',
-  'capture:done', 'capture:progress', 'abort',
+  'ui:start', 'drive:start', 'capture:acquire', 'capture:go', 'capture:bound', 'scroll:start',
+  'page:firstPaint', 'drive:done', 'drive:progress',
+  'capture:done', 'capture:progress', 'progress:total', 'abort',
 ]);
 
 export function isMessage(x: unknown): x is Msg {

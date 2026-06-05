@@ -11,8 +11,25 @@ let driveAborted = false;
 export default defineContentScript({
   matches: ['http://*/*', 'https://*/*'],
   registration: 'manifest',
-  runAt: 'document_idle',
+  runAt: 'document_start',
   main() {
+    // Signal the new page's first paint so the background can start recording before
+    // entrance animations begin. (Paint Holding shows the old page until this fires.)
+    let firstPaintSent = false;
+    const reportFirstPaint = () => {
+      if (firstPaintSent) return;
+      firstPaintSent = true;
+      browser.runtime.sendMessage({ type: 'page:firstPaint' }).catch(() => {});
+    };
+    try {
+      const po = new PerformanceObserver((list) => {
+        for (const e of list.getEntries()) if (e.name === 'first-contentful-paint') { po.disconnect(); reportFirstPaint(); }
+      });
+      po.observe({ type: 'paint', buffered: true });
+    } catch { /* PerformanceObserver unavailable */ }
+    requestAnimationFrame(() => requestAnimationFrame(reportFirstPaint)); // after the first compositor paint
+    setTimeout(reportFirstPaint, 300); // final fallback
+
     // drive:start → prep DOM + measure the plan, respond with {totalFrames,width,height}
     browser.runtime.onMessage.addListener((raw, _sender, sendResponse) => {
       if (!isMessage(raw) || raw.type !== 'drive:start') return;
@@ -47,7 +64,7 @@ async function prepareAndReportPlan(fps: number, rawOptions: unknown) {
     contentHeight, viewportHeight, fps, scrollSpeed: opts.scrollSpeed,
     ...(opts.duration !== undefined ? { duration: opts.duration } : {}),
     minDurationS: opts.minDurationS, maxDurationS: opts.maxDurationS,
-    holdStartMs: opts.holds.startMs, holdEndMs: opts.holds.endMs, easing: opts.easing,
+    holdStartMs: opts.pageHoldMs, holdEndMs: opts.holds.endMs, easing: opts.easing,
     style: opts.scrollStyle, roundTrip: opts.roundTrip,
     pageHoldMs: opts.pageHoldMs, pageScrollMs: opts.pageScrollMs, pageFraction: opts.pageFraction,
     ...(stops ? { stops } : {}),

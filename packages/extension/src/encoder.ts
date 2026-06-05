@@ -3,41 +3,60 @@ import { Output, Mp4OutputFormat, BufferTarget, CanvasSource, canEncodeVideo } f
 
 export interface EncodeParams {
   track: MediaStreamVideoTrack;
-  width: number;
-  height: number;
   fps: number;
-  totalFrames: number;
   bitrate?: number;
   signal: AbortSignal;
   /** Aborted when the scroll has finished — the encoder then finalizes what it has. */
   done: AbortSignal;
   onProgress?: (frame: number) => void;
+  /** Dynamic cap updated by capture:bound messages; encoder respects the latest value. */
+  maxFramesRef?: { current: number };
 }
 export interface EncodeResult { buffer: ArrayBuffer; encoder: string }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /**
- * Read the live tab track, and on a fixed 1/fps clock draw the latest received
- * frame to a canvas and add it to the muxer with an exact CFR timestamp.
- * Empty slots duplicate the held frame; bursts are dropped (latest wins) — the
- * real-time realisation of buildSampleSchedule.
+ * Read the live tab track, size the canvas from the FIRST captured frame (no dims
+ * passed in), and encode on a fixed 1/fps clock. Empty slots duplicate the held
+ * frame; bursts are dropped (latest wins). The dynamic maxFramesRef cap is tightened
+ * by capture:bound once the scroll plan is known.
  */
 export async function encodeTabStream(p: EncodeParams): Promise<EncodeResult> {
-  const bitrate = p.bitrate ?? 14_000_000;
   if (p.track.readyState === 'ended') throw new Error('capture track already ended');
-  if (!(await canEncodeVideo('avc', { width: p.width, height: p.height, bitrate }))) {
+  const bitrate = p.bitrate ?? 14_000_000;
+  const reader = new MediaStreamTrackProcessor({ track: p.track, maxBufferSize: 1 }).readable.getReader();
+
+  // Read the first non-degenerate frame to seed the canvas dimensions (this is the
+  // first frame AFTER capture:go, i.e. the new page at first paint).
+  let latest: VideoFrame | null = null;
+  const seedDeadline = performance.now() + 3000;
+  while (!latest) {
+    if (p.signal.aborted) { await reader.cancel().catch(() => {}); p.track.stop(); throw new Error('aborted'); }
+    const { value, done } = await reader.read();
+    if (done) break;
+    if (value.displayWidth > 0 && value.displayHeight > 0) { latest = value; break; }
+    value.close();
+    if (performance.now() > seedDeadline) break;
+  }
+  if (!latest) { await reader.cancel().catch(() => {}); p.track.stop(); throw new Error('no capture frame received'); }
+  const W = latest.displayWidth & ~1;
+  const H = latest.displayHeight & ~1;
+
+  if (!(await canEncodeVideo('avc', { width: W, height: H, bitrate }))) {
+    latest.close();
+    await reader.cancel().catch(() => {});
     return recordWithMediaRecorder(p);
   }
-  const canvas = new OffscreenCanvas(p.width, p.height);
+
+  const canvas = new OffscreenCanvas(W, H);
   const ctx = canvas.getContext('2d', { alpha: false })!;
   const output = new Output({ format: new Mp4OutputFormat({ fastStart: 'in-memory' }), target: new BufferTarget() });
   const source = new CanvasSource(canvas, { codec: 'avc', bitrate });
   output.addVideoTrack(source, { frameRate: p.fps });
   await output.start();
 
-  const reader = (new MediaStreamTrackProcessor({ track: p.track }).readable).getReader();
-  let latest: VideoFrame | null = null;
+  // Pump: keep the freshest frame in `latest` (seed is already set).
   let reading = true;
   const pump = (async () => {
     try {
@@ -54,14 +73,11 @@ export async function encodeTabStream(p: EncodeParams): Promise<EncodeResult> {
   })();
 
   const slotMs = 1000 / p.fps;
+  const FIXED_SAFETY = 180 * p.fps;
   const t0 = performance.now();
-  // Record on the fixed grid until the scroll signals completion (p.done), or abort,
-  // or a safety cap (never run more than ~2s past the planned length). Stopping on the
-  // scroll-done signal — not a fixed frame count — guarantees the whole scroll (incl.
-  // its end-hold/tail) is captured even though the encoder clock starts slightly early.
-  const hardCap = p.totalFrames + Math.ceil(p.fps * 2);
   try {
-    for (let n = 0; n < hardCap; n++) {
+    for (let n = 0; ; n++) {
+      if (n >= Math.min(p.maxFramesRef?.current ?? FIXED_SAFETY, FIXED_SAFETY)) break;
       if (p.signal.aborted) throw new Error('aborted');
       if (p.done.aborted) break;
       const due = t0 + n * slotMs;
@@ -69,7 +85,7 @@ export async function encodeTabStream(p: EncodeParams): Promise<EncodeResult> {
       if (wait > 0) await sleep(wait);
       if (p.signal.aborted) throw new Error('aborted');
       if (p.done.aborted) break;
-      if (latest) ctx.drawImage(latest, 0, 0, p.width, p.height);
+      if (latest) ctx.drawImage(latest, 0, 0, W, H);
       await source.add(n / p.fps, 1 / p.fps);
       p.onProgress?.(n + 1);
     }
@@ -88,8 +104,8 @@ export async function encodeTabStream(p: EncodeParams): Promise<EncodeResult> {
  * Robustness floor: when WebCodecs avc encoding is unavailable, record the live
  * track with MediaRecorder. Prefers an MP4/avc1 container when the platform
  * supports it, else WebM/VP9. This path is variable-frame-rate (no CFR reclock)
- * and exists only so the user always gets *a* file. Stops after the planned
- * duration (totalFrames / fps) or on abort.
+ * and exists only so the user always gets *a* file. Stops on the done signal; a
+ * fixed backstop prevents unbounded recording.
  */
 async function recordWithMediaRecorder(p: EncodeParams): Promise<EncodeResult> {
   const MP4 = 'video/mp4;codecs=avc1.42E01E';
@@ -108,8 +124,8 @@ async function recordWithMediaRecorder(p: EncodeParams): Promise<EncodeResult> {
   rec.start(1000); // 1s timeslices keep memory bounded for long captures
 
   // Primary stop is the scroll-done signal (p.done); this time cap is only a backstop
-  // (+3s) so end-holds / IPC skew don't truncate the recording.
-  const stopAt = performance.now() + (p.totalFrames / p.fps) * 1000 + 3000;
+  // so end-holds / IPC skew don't truncate the recording.
+  const stopAt = performance.now() + 180_000;
   while (!p.signal.aborted && !p.done.aborted && performance.now() < stopAt) await sleep(50);
 
   if (rec.state !== 'inactive') rec.stop();
