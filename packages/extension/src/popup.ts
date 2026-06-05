@@ -18,15 +18,23 @@ const clearPreset = $('clearPreset') as HTMLButtonElement;
 
 let stops: ScrollStop[] | undefined;
 let recording = false;
-let total = 0;
+let cancelTimer: ReturnType<typeof setTimeout> | undefined;
 
 const numVal = (id: string) => Number(($(id) as HTMLInputElement).value);
 const setNum = (id: string, v: number) => { ($(id) as HTMLInputElement).value = String(v); };
 
 // Easing options
+const EASING_LABELS: Record<string, string> = {
+  linear: 'Linear',
+  easeIn: 'Ease in',
+  easeOut: 'Ease out',
+  easeInOut: 'Ease in-out (default)',
+  easeInOutSine: 'Smooth (sine)',
+  smoothstep: 'Smoothstep',
+};
 for (const e of EASINGS) {
   const o = document.createElement('option');
-  o.value = e; o.textContent = e;
+  o.value = e; o.textContent = EASING_LABELS[e] ?? e;
   if (e === 'easeInOut') o.selected = true;
   easingSel.append(o);
 }
@@ -72,7 +80,7 @@ function applyPreset(preset: NormalizedPreset, note: string): void {
   presetInfo.textContent =
     `${note}${preset.name ? ` "${preset.name}"` : ''}: ${pointWord(n)}` +
     (preset.profile ? `, ${preset.profile} profile` : '');
-  pppHint.textContent = n > 0 ? `${pointWord(n)} loaded` : 'optional';
+  pppHint.textContent = n > 0 ? `${pointWord(n)} loaded` : 'optional — stop at specific spots';
   clearPreset.hidden = n === 0;
   if (n > 0 && stops) {
     // one point per line (compact, matches the example format) rather than fully-expanded JSON
@@ -86,7 +94,7 @@ function applyPreset(preset: NormalizedPreset, note: string): void {
 async function clearLoadedPoints(): Promise<void> {
   stops = undefined;
   presetInfo.textContent = '';
-  pppHint.textContent = 'optional';
+  pppHint.textContent = 'optional — stop at specific spots';
   clearPreset.hidden = true;
   loadedView.hidden = true;
   loadedView.open = false;
@@ -110,20 +118,75 @@ void (async () => {
   if (cached && (cached.stops?.length || cached.profile)) applyPreset(cached, 'Reusing saved');
 })();
 
+// Reload note visibility
+const reloadNote = $('reloadNote');
+const reloadCb = $('reload') as HTMLInputElement;
+const syncReloadNote = () => { reloadNote.hidden = !reloadCb.checked; };
+reloadCb.addEventListener('change', syncReloadNote);
+syncReloadNote();
+
+// Style-aware Advanced knobs
+const styleSel = $('style') as HTMLSelectElement;
+const syncStyleKnobs = () => {
+  const reading = styleSel.value === 'reading';
+  document.querySelectorAll<HTMLElement>('.reading-only').forEach((el) => { el.style.display = reading ? '' : 'none'; });
+  document.querySelectorAll<HTMLElement>('.continuous-only').forEach((el) => { el.style.display = reading ? 'none' : ''; });
+};
+styleSel.addEventListener('change', syncStyleKnobs);
+syncStyleKnobs();
+
+// On open: populate the target chip and guard Record button for uncapturable pages.
+void (async () => {
+  try {
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    const url = tab?.url ?? '';
+    let host = '';
+    try { host = new URL(url).host; } catch { /* */ }
+    const supported = /^https?:$/.test((() => { try { return new URL(url).protocol; } catch { return ''; } })())
+      && !/^https:\/\/chrome\.google\.com\/webstore/.test(url) && !/^https:\/\/chromewebstore\.google\.com/.test(url);
+    if (host) {
+      ($('tabHost') as HTMLSpanElement).textContent = host;
+      if (tab?.favIconUrl) ($('tabIcon') as HTMLImageElement).src = tab.favIconUrl; else ($('tabIcon') as HTMLImageElement).hidden = true;
+      ($('target') as HTMLDivElement).hidden = false;
+    }
+    if (!supported) {
+      go.disabled = true;
+      go.style.opacity = '0.5';
+      go.style.cursor = 'not-allowed';
+      status.textContent = 'Page Capture only records normal web pages (http/https). This page can\'t be recorded.';
+    }
+  } catch { /* leave enabled */ }
+})();
+
 $('preset').addEventListener('change', async (ev) => {
   const file = (ev.target as HTMLInputElement).files?.[0];
   if (!file) return;
-  try {
-    const preset = normalizePreset(JSON.parse(await file.text()));
-    applyPreset(preset, 'Loaded');
-    void savePresetForPage(preset); // cache it for next time on this page
-    ($('ppp') as HTMLDetailsElement).open = true; // surface what was just loaded
-  } catch (e) {
+  if (file.size > 256 * 1024) {
+    presetInfo.textContent = 'That file is too large (max 256 KB).';
+    return;
+  }
+  const reset = () => {
     stops = undefined;
     loadedView.hidden = true;
     clearPreset.hidden = true;
-    pppHint.textContent = 'optional';
-    presetInfo.textContent = `Invalid file: ${(e as Error).message}`;
+    pppHint.textContent = 'optional — stop at specific spots';
+  };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(await file.text());
+  } catch {
+    reset();
+    presetInfo.textContent = "That file isn't valid JSON.";
+    return;
+  }
+  try {
+    const preset = normalizePreset(parsed);
+    applyPreset(preset, 'Loaded');
+    void savePresetForPage(preset); // cache it for next time on this page
+    ($('ppp') as HTMLDetailsElement).open = true; // surface what was just loaded
+  } catch {
+    reset();
+    presetInfo.textContent = 'Not a valid pause-points file — each item needs a selector, percent, or offset.';
   }
 });
 
@@ -135,18 +198,20 @@ function setRecording(on: boolean): void {
 
 browser.runtime.onMessage.addListener((raw) => {
   if (!isMessage(raw)) return;
-  if (raw.type === 'progress:total') total = raw.totalFrames;
-  if (raw.type === 'capture:progress') status.textContent = total > 0 ? `Encoding ${raw.frame}/${total}…` : `Encoding ${raw.frame}…`;
-  if (raw.type === 'capture:done') {
-    status.textContent = raw.ok ? `Done (${raw.encoder}).` : `Failed: ${raw.error}`;
+  if (raw.type === 'capture:phase') status.textContent = raw.phase;
+  else if (raw.type === 'drive:progress') status.textContent = `Recording ${raw.frame}/${raw.totalFrames}…`;
+  else if (raw.type === 'capture:done') {
+    status.textContent = raw.ok ? `Saved as ${raw.encoder.includes('webm') ? 'WebM' : 'MP4'}.` : `Failed: ${raw.error}`;
     setRecording(false);
+    if (cancelTimer !== undefined) { clearTimeout(cancelTimer); cancelTimer = undefined; }
   }
 });
 
 go.addEventListener('click', () => {
   if (recording) {
-    browser.runtime.sendMessage({ type: 'abort' }).catch(() => {});
+    browser.runtime.sendMessage({ type: 'abort', reason: 'Recording cancelled.' }).catch(() => {});
     status.textContent = 'Cancelling…';
+    cancelTimer = setTimeout(() => { setRecording(false); status.textContent = 'Recording cancelled.'; }, 4000);
     return;
   }
   const maxH = numVal('maxHeight');
@@ -167,7 +232,6 @@ go.addEventListener('click', () => {
   };
   const parsed = CaptureOptionsSchema.safeParse(optionsInput);
   if (!parsed.success) { status.textContent = parsed.error.issues[0]?.message ?? 'invalid options'; return; }
-  total = 0;
   setRecording(true);
   status.textContent = 'Starting… keep this tab in front.';
   browser.runtime.sendMessage({ type: 'ui:start', options: parsed.data }).then(

@@ -159,6 +159,11 @@
 
       #status { margin-top: 11px; font-size: 12px; color: var(--muted); min-height: 1.2em; text-align: center; }
       .hint { color: var(--muted); font-weight: 400; font-size: 11px; }
+      .caption { margin: 5px 0 0; font-size: 11px; line-height: 1.4; color: var(--muted); }
+      .target { display: flex; align-items: center; gap: 7px; margin: 4px 0 8px; font-size: 12px; color: var(--muted); }
+      .target img { width: 16px; height: 16px; border-radius: 3px; flex: none; }
+      .target span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
     </style>
   </head>
   <body>
@@ -175,7 +180,7 @@
     </header>
 
     <div class="field">
-      <span class="lbl">Profile
+      <span class="lbl">Speed
         <span class="info" tabindex="0" data-tip="Slow / Medium / Fast preset all the timings below (dwell + scroll speed). Pick Custom, or edit any Advanced value, to use your own.">i</span>
       </span>
       <select id="profile">
@@ -191,18 +196,23 @@
         <span class="lbl">Style
           <span class="info" tabindex="0" data-tip="Reading scrolls one screen, pauses to ‘read’, then continues — like a person reading down the page. Continuous is one smooth glide from top to bottom.">i</span>
         </span>
-        <select id="style"><option value="reading">reading</option><option value="continuous">continuous</option></select>
+        <select id="style"><option value="reading">Reading</option><option value="continuous">Continuous</option></select>
       </div>
       <div class="field">
         <span class="lbl">Direction
           <span class="info" tabindex="0" data-tip="Round trip: after reaching the bottom, scroll back up to the top before finishing the recording.">i</span>
         </span>
-        <label class="check"><input type="checkbox" id="roundTrip" /> round trip</label>
+        <label class="check"><input type="checkbox" id="roundTrip" /> Round trip</label>
       </div>
     </div>
 
+    <div class="field">
+      <label class="check"><input type="checkbox" id="reload" checked /> Reload page first</label>
+      <p id="reloadNote" class="caption">Reloads the tab to capture on-load animations — unsaved page changes on this tab will be lost.</p>
+    </div>
+
     <details class="disc" id="ppp">
-      <summary><span>Page pause points <span class="hint" id="pppHint">optional</span></span></summary>
+      <summary><span>Page pause points <span class="hint" id="pppHint">optional — stop at specific spots</span></span></summary>
       <div class="disc-body">
         <label class="file">
           <input type="file" id="preset" accept=".json,application/json" />
@@ -247,17 +257,17 @@
           </div>
         </div>
         <div class="row">
-          <div class="field">
+          <div class="field reading-only">
             <span class="lbl">Page hold (ms) <span class="info" tabindex="0" data-tip="Reading style: how long to dwell on each screen — and at the top before the first scroll — in milliseconds.">i</span></span>
             <input type="number" id="pageHold" min="0" />
           </div>
-          <div class="field">
+          <div class="field reading-only">
             <span class="lbl">Page scroll (ms) <span class="info" tabindex="0" data-tip="Reading style: the glide time between one screen and the next, in milliseconds. Lower = faster scrolling.">i</span></span>
             <input type="number" id="pageScroll" min="0" />
           </div>
         </div>
         <div class="row">
-          <div class="field">
+          <div class="field continuous-only">
             <span class="lbl">Velocity (vh/s) <span class="info" tabindex="0" data-tip="Continuous style: scroll speed in viewport-heights per second. Higher scrolls the page faster.">i</span></span>
             <input type="number" id="velocity" min="0" step="0.01" />
           </div>
@@ -274,16 +284,13 @@
           <div class="field"></div>
         </div>
         <div class="check-row">
-          <label class="check"><input type="checkbox" id="hideFixed" /> hide fixed / sticky elements</label>
+          <label class="check"><input type="checkbox" id="hideFixed" /> Hide fixed / sticky elements</label>
           <span class="info" tabindex="0" data-tip="Hide fixed/sticky elements (floating headers, cookie bars, chat widgets) so they don’t cover content while scrolling.">i</span>
-        </div>
-        <div class="check-row">
-          <label class="check"><input type="checkbox" id="reload" checked /> reload page first</label>
-          <span class="info" tabindex="0" data-tip="Reload the page before recording so on-load / entrance animations replay and are captured from the very start.">i</span>
         </div>
       </div>
     </details>
 
+    <div class="target" id="target" hidden><img id="tabIcon" alt="" /><span id="tabHost"></span></div>
     <button id="go">Record this tab</button>
     <div id="status"></div>
     <script type="module" src="../src/popup.ts"></script>
