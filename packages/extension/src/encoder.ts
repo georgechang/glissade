@@ -176,7 +176,9 @@ async function recordWithMediaRecorder(p: EncodeParams): Promise<EncodeResult> {
   });
   rec.start(1000); // 1s timeslices keep memory bounded for long captures
 
-  const stopAt = performance.now() + (p.totalFrames / p.fps) * 1000;
+  // Primary stop is the scroll-done signal (p.done); this time cap is only a backstop
+  // (+3s) so end-holds / IPC skew don't truncate the recording.
+  const stopAt = performance.now() + (p.totalFrames / p.fps) * 1000 + 3000;
   while (!p.signal.aborted && !p.done.aborted && performance.now() < stopAt) await sleep(50);
 
   if (rec.state !== 'inactive') rec.stop();

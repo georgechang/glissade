@@ -15,15 +15,20 @@ async function ensureOffscreen(): Promise<void> {
 /** Reload the tab and resolve once it has finished loading (+ a short settle so the
  *  freshly-injected content script is listening and fonts/lazy content have settled). */
 async function reloadAndWait(tabId: number): Promise<void> {
-  await browser.tabs.reload(tabId);
   await new Promise<void>((resolve) => {
-    const onUpdated = (id: number, info: { status?: string }) => {
-      if (id === tabId && info.status === 'complete') {
-        browser.tabs.onUpdated.removeListener(onUpdated);
-        resolve();
-      }
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      browser.tabs.onUpdated.removeListener(onUpdated);
+      resolve();
     };
-    browser.tabs.onUpdated.addListener(onUpdated);
+    const onUpdated = (id: number, info: { status?: string }) => {
+      if (id === tabId && info.status === 'complete') finish();
+    };
+    browser.tabs.onUpdated.addListener(onUpdated); // attach BEFORE reload to avoid missing 'complete'
+    setTimeout(finish, 30_000); // safety: never hang waiting for load
+    browser.tabs.reload(tabId).catch(finish);
   });
   await new Promise((r) => setTimeout(r, 800));
 }

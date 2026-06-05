@@ -7,11 +7,16 @@ let controller = new AbortController();
 let doneController = new AbortController();
 let held: { track: MediaStreamVideoTrack; fps: number } | null = null;
 
-browser.runtime.onMessage.addListener((raw) => {
+browser.runtime.onMessage.addListener((raw, _sender, sendResponse) => {
   if (!isMessage(raw)) return;
   if (raw.type === 'abort') { controller.abort(); return; }
   if (raw.type === 'drive:done') { doneController.abort(); return; }
-  if (raw.type === 'capture:acquire') { void acquire(raw); return; }
+  if (raw.type === 'capture:acquire') {
+    // Ack only AFTER getUserMedia resolves so the background won't send capture:go
+    // (which needs the held track) before the stream exists.
+    void acquire(raw).then(() => sendResponse({}), () => sendResponse({}));
+    return true; // keep the channel open for the async ack
+  }
   if (raw.type === 'capture:go') { void go(raw); return; }
 });
 
