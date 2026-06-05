@@ -4,72 +4,216 @@
     <meta charset="utf-8" />
     <title>Page Capture</title>
     <style>
-      body { font: 13px system-ui, sans-serif; width: 300px; padding: 12px; margin: 0; }
-      h1 { font-size: 14px; margin: 0 0 10px; }
-      label { display: block; margin: 8px 0 2px; font-weight: 500; }
-      .row { display: flex; gap: 8px; }
-      .row > div { flex: 1; }
-      input, select { width: 100%; box-sizing: border-box; }
-      .chk { display: flex; align-items: center; gap: 6px; font-weight: 400; margin: 8px 0; }
-      .chk input { width: auto; }
-      details { margin-top: 10px; border-top: 1px solid #eee; padding-top: 6px; }
-      summary { cursor: pointer; font-weight: 600; }
-      #go { margin-top: 12px; width: 100%; padding: 8px; font-weight: 600; }
-      #go.danger { background: #c0392b; color: #fff; }
-      #status { margin-top: 8px; color: #555; min-height: 1.2em; }
-      .hint { color: #888; font-weight: 400; font-size: 11px; }
+      :root {
+        color-scheme: light dark;
+        --bg: #ffffff;
+        --fg: #15171c;
+        --muted: #6b7280;
+        --field-bg: #ffffff;
+        --field-border: #d6dae1;
+        --border: #ebedf0;
+        --surface: #f7f8fa;
+        --accent: #4f46e5;
+        --accent-hi: #6366f1;
+        --accent-fg: #ffffff;
+        --danger: #dc2626;
+        --radius: 9px;
+        --caret: "%236b7280";
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #1b1c20;
+          --fg: #e9eaee;
+          --muted: #9aa0aa;
+          --field-bg: #26272d;
+          --field-border: #3a3c44;
+          --border: #2d2e35;
+          --surface: #222329;
+          --accent: #6366f1;
+          --accent-hi: #818cf8;
+          --caret: "%239aa0aa";
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        width: 344px;
+        padding: 16px;
+        font: 13px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        color: var(--fg);
+        background: var(--bg);
+        -webkit-font-smoothing: antialiased;
+      }
+      header { display: flex; align-items: center; gap: 11px; margin-bottom: 16px; }
+      .logo {
+        width: 30px; height: 30px; border-radius: 9px; flex: none;
+        display: grid; place-items: center; color: #fff;
+        background: linear-gradient(140deg, var(--accent-hi), #a855f7);
+        box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 35%, transparent);
+      }
+      header h1 { font-size: 14px; font-weight: 640; margin: 0; letter-spacing: -0.01em; }
+      header p { font-size: 11px; color: var(--muted); margin: 1px 0 0; }
+
+      .field { margin-bottom: 13px; }
+      .row { display: flex; gap: 11px; }
+      .row > .field { flex: 1; margin-bottom: 13px; }
+      .lbl {
+        display: block; font-size: 10.5px; font-weight: 600; color: var(--muted);
+        text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;
+      }
+
+      select, input[type="number"] {
+        width: 100%; height: 34px; padding: 0 11px; font: inherit; color: var(--fg);
+        background: var(--field-bg); border: 1px solid var(--field-border);
+        border-radius: var(--radius); appearance: none; outline: none; transition: border-color .12s, box-shadow .12s;
+      }
+      select {
+        cursor: pointer; padding-right: 30px;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888d97' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
+        background-repeat: no-repeat; background-position: right 10px center;
+      }
+      select:focus, input[type="number"]:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+      }
+
+      .check { display: flex; align-items: center; gap: 8px; height: 34px; font-size: 13px; cursor: pointer; user-select: none; }
+      .check input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+
+      /* file picker styled as a dashed drop button (real <input> overlaid, keeps #preset) */
+      .file { position: relative; display: block; }
+      .file input[type="file"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+      .file .file-btn {
+        display: flex; align-items: center; justify-content: center; gap: 7px; height: 38px;
+        border: 1.5px dashed var(--field-border); border-radius: var(--radius);
+        background: var(--surface); color: var(--muted); font-size: 12.5px; transition: border-color .12s, color .12s;
+      }
+      .file:hover .file-btn { border-color: var(--accent); color: var(--fg); }
+      #presetInfo { margin-top: 6px; }
+
+      details.disc {
+        border: 1px solid var(--border); border-radius: var(--radius);
+        background: var(--surface); overflow: hidden; margin-bottom: 13px;
+      }
+      details.disc > summary {
+        list-style: none; cursor: pointer; padding: 10px 12px; font-weight: 600; font-size: 12px;
+        display: flex; align-items: center; justify-content: space-between; color: var(--fg);
+      }
+      details.disc > summary::-webkit-details-marker { display: none; }
+      details.disc > summary::after {
+        content: ""; width: 8px; height: 8px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted);
+        transform: rotate(45deg); transition: transform .15s; margin-right: 2px;
+      }
+      details.disc[open] > summary::after { transform: rotate(225deg); }
+      details.disc[open] > summary { border-bottom: 1px solid var(--border); }
+      .disc-body { padding: 12px; }
+      .disc-body .row:last-child, .disc-body .field:last-child { margin-bottom: 0; }
+
+      pre.example {
+        margin: 0; padding: 10px 11px; font: 10.5px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: var(--fg); background: var(--bg); border: 1px solid var(--border); border-radius: 7px;
+        white-space: pre; overflow-x: auto;
+      }
+      .example-note code { font: 10.5px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--fg); }
+      .example-note { margin: 9px 0 0; font-size: 11px; color: var(--muted); }
+
+      #go {
+        width: 100%; height: 42px; margin-top: 4px; border: 0; border-radius: var(--radius);
+        font: inherit; font-weight: 650; font-size: 14px; color: var(--accent-fg);
+        background: var(--accent); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+        transition: filter .12s, transform .05s, background .12s;
+      }
+      #go::before {
+        content: ""; width: 9px; height: 9px; border-radius: 50%; background: currentColor;
+      }
+      #go:hover { filter: brightness(1.08); }
+      #go:active { transform: translateY(1px); }
+      #go.danger { background: var(--danger); }
+      #go.danger::before { border-radius: 2px; }
+
+      #status { margin-top: 11px; font-size: 12px; color: var(--muted); min-height: 1.2em; text-align: center; }
+      .hint { color: var(--muted); font-weight: 400; font-size: 11px; }
     </style>
   </head>
   <body>
-    <h1>Page Capture — scroll to video</h1>
-
-    <div class="row">
+    <header>
+      <span class="logo" aria-hidden="true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 4v12" /><path d="M6 10l6 6 6-6" />
+        </svg>
+      </span>
       <div>
-        <label>Profile</label>
-        <select id="profile">
-          <option value="slow">Slow</option>
-          <option value="medium" selected>Medium</option>
-          <option value="fast">Fast</option>
-          <option value="custom">Custom</option>
-        </select>
+        <h1>Page Capture</h1>
+        <p>Record this tab scrolling as an MP4</p>
       </div>
+    </header>
+
+    <div class="field">
+      <span class="lbl">Profile</span>
+      <select id="profile">
+        <option value="slow">Slow</option>
+        <option value="medium" selected>Medium</option>
+        <option value="fast">Fast</option>
+        <option value="custom">Custom</option>
+      </select>
     </div>
 
     <div class="row">
-      <div>
-        <label>Style</label>
+      <div class="field">
+        <span class="lbl">Style</span>
         <select id="style"><option value="reading">reading</option><option value="continuous">continuous</option></select>
       </div>
-      <div>
-        <label>&nbsp;</label>
-        <label class="chk"><input type="checkbox" id="roundTrip" /> round trip</label>
+      <div class="field">
+        <span class="lbl">Direction</span>
+        <label class="check"><input type="checkbox" id="roundTrip" /> round trip</label>
       </div>
     </div>
 
-    <label>Preset (stops .json) <span class="hint">optional</span></label>
-    <input type="file" id="preset" accept=".json,application/json" />
-    <div id="presetInfo" class="hint"></div>
+    <div class="field">
+      <span class="lbl">Preset <span class="hint">optional · pause points</span></span>
+      <label class="file">
+        <input type="file" id="preset" accept=".json,application/json" />
+        <span class="file-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4" /><path d="M7 9l5-5 5 5" /><path d="M5 20h14" /></svg>
+          Choose a .json preset…
+        </span>
+      </label>
+      <div id="presetInfo" class="hint"></div>
+      <details class="disc" style="margin-top: 10px;">
+        <summary>Example preset</summary>
+        <div class="disc-body">
+<pre class="example">[
+  { "selector": "#hero", "holdMs": 2000 },
+  { "percent": 40 },
+  { "offset": 1200 }
+]</pre>
+          <p class="example-note">An array of pause points — each with a CSS <code>selector</code>, a <code>percent</code> (0–100) of the page, or a pixel <code>offset</code>; optional <code>holdMs</code> dwell. Also accepts <code>{ "name", "profile", "stops": [...] }</code>.</p>
+        </div>
+      </details>
+    </div>
 
-    <details id="adv">
+    <details class="disc" id="adv">
       <summary>Advanced</summary>
-      <div class="row">
-        <div><label>FPS</label><select id="fps"><option>30</option><option>60</option></select></div>
-        <div><label>Easing</label><select id="easing"></select></div>
+      <div class="disc-body">
+        <div class="row">
+          <div class="field"><span class="lbl">FPS</span><select id="fps"><option>30</option><option>60</option></select></div>
+          <div class="field"><span class="lbl">Easing</span><select id="easing"></select></div>
+        </div>
+        <div class="row">
+          <div class="field"><span class="lbl">Page hold (ms)</span><input type="number" id="pageHold" min="0" /></div>
+          <div class="field"><span class="lbl">Page scroll (ms)</span><input type="number" id="pageScroll" min="0" /></div>
+        </div>
+        <div class="row">
+          <div class="field"><span class="lbl">Velocity (vh/s)</span><input type="number" id="velocity" min="0" step="0.01" /></div>
+          <div class="field"><span class="lbl">Max height (px)</span><input type="number" id="maxHeight" min="0" placeholder="auto" /></div>
+        </div>
+        <div class="row">
+          <div class="field"><span class="lbl">Hold start (ms)</span><input type="number" id="holdStart" min="0" /></div>
+          <div class="field"><span class="lbl">Hold end (ms)</span><input type="number" id="holdEnd" min="0" /></div>
+        </div>
+        <label class="check"><input type="checkbox" id="hideFixed" /> hide fixed / sticky elements</label>
+        <label class="check"><input type="checkbox" id="reload" checked /> reload page first</label>
       </div>
-      <div class="row">
-        <div><label>Page hold (ms)</label><input type="number" id="pageHold" min="0" /></div>
-        <div><label>Page scroll (ms)</label><input type="number" id="pageScroll" min="0" /></div>
-      </div>
-      <div class="row">
-        <div><label>Velocity (vh/s)</label><input type="number" id="velocity" min="0" step="0.01" /></div>
-        <div><label>Max height (px)</label><input type="number" id="maxHeight" min="0" placeholder="auto" /></div>
-      </div>
-      <div class="row">
-        <div><label>Hold start (ms)</label><input type="number" id="holdStart" min="0" /></div>
-        <div><label>Hold end (ms)</label><input type="number" id="holdEnd" min="0" /></div>
-      </div>
-      <label class="chk"><input type="checkbox" id="hideFixed" /> hide fixed/sticky elements</label>
-      <label class="chk"><input type="checkbox" id="reload" checked /> reload page first</label>
     </details>
 
     <button id="go">Record this tab</button>
