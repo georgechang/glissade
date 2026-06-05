@@ -3,9 +3,11 @@
 ## What this is
 
 A **Chrome MV3 extension** (built with [WXT](https://wxt.dev)) that records the user's
-active browser tab **scrolling down a page** into a smooth **H.264 MP4**, for slide decks.
-It records the page's **entrance/on-load animations** (starts at first paint) and
-**scroll-triggered animations**, all client-side — no server, no upload.
+active browser tab **scrolling down a page** into a smooth **H.264 MP4** — useful anywhere a
+moving capture beats a static screenshot (demos, docs, presentations, marketing/social clips,
+design reviews, archiving a page's look, etc.; slide decks are just one case). It records the
+page's **entrance/on-load animations** (starts at first paint) and **scroll-triggered
+animations**, all client-side — no server, no upload.
 
 > History: this began as a headless Node + Playwright + ffmpeg engine. That approach was
 > **deleted** — capturing 60fps + `<video>` + WebGL faithfully on heavy/Cloudflare sites was

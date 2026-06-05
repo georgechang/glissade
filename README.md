@@ -1,6 +1,6 @@
 # page-capture
 
-Turn a **screenshot** or a **URL** into a smooth **scrolling animation** (MP4 or GIF) for slide decks and other assets. For URLs it drives a real browser, so **scroll-triggered animations** (IntersectionObserver, AOS, GSAP ScrollTrigger, lazy reveals) are captured faithfully.
+Turn a **screenshot** or a **URL** into a smooth **scrolling animation** (MP4 or GIF) — for demos, docs, presentations, marketing/social clips, design reviews, and other assets. For URLs it drives a real browser, so **scroll-triggered animations** (IntersectionObserver, AOS, GSAP ScrollTrigger, lazy reveals) are captured faithfully.
 
 ```
 page-capture ./tall-screenshot.png -o scroll.mp4
