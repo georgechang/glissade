@@ -82,7 +82,7 @@ async function drive(fps: number, plan: { totalFrames: number; offsetForFrame: (
   const onVisibility = () => {
     if (document.visibilityState === 'hidden' && !driveAborted) {
       driveAborted = true;
-      browser.runtime.sendMessage({ type: 'abort' }).catch(() => {});
+      browser.runtime.sendMessage({ type: 'abort', reason: 'The tab lost focus — keep it in front while recording.' }).catch(() => {});
       console.warn('page-capture: tab left foreground — capture aborted');
     }
   };

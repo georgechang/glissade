@@ -7,10 +7,11 @@ let controller = new AbortController();
 let doneController = new AbortController();
 let held: { track: MediaStreamVideoTrack; fps: number } | null = null;
 const maxFramesRef = { current: 0 };
+let abortReason = '';
 
 browser.runtime.onMessage.addListener((raw, _sender, sendResponse) => {
   if (!isMessage(raw)) return;
-  if (raw.type === 'abort') { controller.abort(); return; }
+  if (raw.type === 'abort') { abortReason = raw.reason ?? 'Recording cancelled.'; controller.abort(); return; }
   if (raw.type === 'drive:done') { doneController.abort(); return; }
   if (raw.type === 'capture:bound') { maxFramesRef.current = raw.maxFrames; return; }
   if (raw.type === 'capture:acquire') {
@@ -52,6 +53,7 @@ async function go(): Promise<void> {
     return;
   }
   busy = true;
+  abortReason = '';
   const { track, fps } = held;
   held = null;
   // Set a generous default cap; tightened later by capture:bound once the plan is known.
@@ -71,7 +73,8 @@ async function go(): Promise<void> {
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
     browser.runtime.sendMessage({ type: 'capture:done', ok: true, encoder, url, filename: `page-capture.${ext}` } satisfies Msg).catch(() => {});
   } catch (e) {
-    browser.runtime.sendMessage({ type: 'capture:done', ok: false, error: (e as Error).message } satisfies Msg).catch(() => {});
+    const msg = (e as Error).message;
+    browser.runtime.sendMessage({ type: 'capture:done', ok: false, error: msg === 'aborted' ? abortReason : msg } satisfies Msg).catch(() => {});
   } finally {
     busy = false;
   }

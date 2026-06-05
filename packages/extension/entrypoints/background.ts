@@ -2,6 +2,7 @@ import { isMessage, type Msg } from '../src/messages';
 import { CaptureOptionsSchema } from '@page-capture/shared';
 
 let activeTabId: number | undefined;
+let activeHost = '';
 
 async function ensureOffscreen(): Promise<void> {
   if (await browser.offscreen.hasDocument()) return;
@@ -75,7 +76,10 @@ export default defineBackground(() => {
     if (!isMessage(raw) || raw.type !== 'ui:start') return;
     void start(raw.options).then(
       () => sendResponse({ ok: true }),
-      (e) => sendResponse({ ok: false, error: String((e as Error)?.message ?? e) }),
+      (e) => {
+        browser.action.setBadgeText({ text: '' }).catch(() => {});
+        sendResponse({ ok: false, error: String((e as Error)?.message ?? e) });
+      },
     );
     return true; // async sendResponse
   });
@@ -83,10 +87,19 @@ export default defineBackground(() => {
   // On failure → stop the (now pointless) scroll in the content tab.
   browser.runtime.onMessage.addListener((raw) => {
     if (!isMessage(raw) || raw.type !== 'capture:done') return;
+    browser.action.setBadgeText({ text: '' }).catch(() => {});
+    const icon = browser.runtime.getURL('/icon/128.png');
     if (raw.ok) {
-      browser.downloads.download({ url: raw.url, filename: raw.filename, saveAs: true }).catch(() => {});
-    } else if (activeTabId !== undefined) {
-      browser.tabs.sendMessage(activeTabId, { type: 'abort' } satisfies Msg).catch(() => {});
+      const ext = raw.encoder.includes('webm') ? 'webm' : 'mp4';
+      const slug = activeHost.replace(/[^a-z0-9]+/gi, '-').replace(/(^-|-$)/g, '').toLowerCase();
+      const date = new Date().toISOString().slice(0, 10);
+      const filename = `page-capture${slug ? `-${slug}` : ''}-${date}.${ext}`;
+      void browser.runtime.sendMessage({ type: 'capture:phase', phase: 'Saving…' } satisfies Msg).catch(() => {});
+      browser.downloads.download({ url: raw.url, filename, saveAs: true }).catch(() => {});
+      browser.notifications.create({ type: 'basic', iconUrl: icon, title: 'Page Capture', message: `Saved ${filename}` }).catch(() => {});
+    } else {
+      if (activeTabId !== undefined) browser.tabs.sendMessage(activeTabId, { type: 'abort' } satisfies Msg).catch(() => {});
+      browser.notifications.create({ type: 'basic', iconUrl: icon, title: 'Page Capture', message: `Capture failed: ${raw.error}` }).catch(() => {});
     }
   });
 });
@@ -95,6 +108,12 @@ async function start(options: unknown): Promise<void> {
   const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) throw new Error('no active tab');
   activeTabId = tab.id;
+
+  browser.action.setBadgeText({ text: 'REC' }).catch(() => {});
+  browser.action.setBadgeBackgroundColor({ color: '#dc2626' }).catch(() => {});
+
+  try { activeHost = new URL(tab.url ?? '').host.replace(/^www\./, ''); } catch { activeHost = ''; }
+
   const opts = CaptureOptionsSchema.parse(options);
   const fps = opts.fps;
 
@@ -107,11 +126,14 @@ async function start(options: unknown): Promise<void> {
   await browser.runtime.sendMessage({ type: 'capture:acquire', streamId, fps } satisfies Msg);
 
   // 2) Reload the tab so scroll-triggered animations re-arm.
+  const phase = (p: string) => { browser.runtime.sendMessage({ type: 'capture:phase', phase: p } satisfies Msg).catch(() => {}); };
+  phase('Reloading page…');
   await browser.tabs.reload(tab.id);
   // 3) Gate on the new page's first paint (Chrome Paint Holding has ended by now).
   await awaitFirstPaint(tab.id);                                            // new page's first paint
   // 4) Start recording NOW — entrance/on-load animations are captured from here.
   await browser.runtime.sendMessage({ type: 'capture:go' } satisfies Msg);
+  phase('Recording…');
   // 5) Record entrance animations + load as the intro; cap so stalled load can't bloat it.
   await awaitCompleteBounded(tab.id, 2500);
 
