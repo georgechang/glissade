@@ -80,7 +80,8 @@ function applyPreset(preset: NormalizedPreset, note: string): void {
   presetInfo.textContent =
     `${note}${preset.name ? ` "${preset.name}"` : ''}: ${pointWord(n)}` +
     (preset.profile ? `, ${preset.profile} profile` : '');
-  pppHint.textContent = n > 0 ? `${pointWord(n)} loaded` : 'optional — stop at specific spots';
+  pppHint.textContent = n > 0 ? pointWord(n) : 'Optional';
+  pppHint.classList.toggle('loaded', n > 0);
   clearPreset.hidden = n === 0;
   if (n > 0 && stops) {
     // one point per line (compact, matches the example format) rather than fully-expanded JSON
@@ -94,7 +95,8 @@ function applyPreset(preset: NormalizedPreset, note: string): void {
 async function clearLoadedPoints(): Promise<void> {
   stops = undefined;
   presetInfo.textContent = '';
-  pppHint.textContent = 'optional — stop at specific spots';
+  pppHint.textContent = 'Optional';
+  pppHint.classList.remove('loaded');
   clearPreset.hidden = true;
   loadedView.hidden = true;
   loadedView.open = false;
@@ -169,7 +171,8 @@ $('preset').addEventListener('change', async (ev) => {
     stops = undefined;
     loadedView.hidden = true;
     clearPreset.hidden = true;
-    pppHint.textContent = 'optional — stop at specific spots';
+    pppHint.textContent = 'Optional';
+    pppHint.classList.remove('loaded');
   };
   let parsed: unknown;
   try {

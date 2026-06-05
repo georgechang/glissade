@@ -162,6 +162,14 @@
 
       #status { margin-top: 11px; font-size: 12px; color: var(--muted); min-height: 1.2em; text-align: center; }
       .hint { color: var(--muted); font-weight: 400; font-size: 11px; }
+      /* summary tag: "Optional" (muted outline) → "N points" (accent fill) — marks Pause points
+         as skippable and visually distinct from the Advanced card (which has no tag). */
+      .pill {
+        display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 999px;
+        font-size: 10px; font-weight: 600; letter-spacing: .02em; text-transform: none; vertical-align: middle;
+        color: var(--muted); background: var(--bg); border: 1px solid var(--field-border);
+      }
+      .pill.loaded { color: var(--accent-fg); background: var(--accent); border-color: transparent; }
       .caption { margin: 5px 0 0; font-size: 11px; line-height: 1.4; color: var(--muted); }
       .target { display: flex; align-items: center; gap: 7px; margin: 4px 0 8px; font-size: 12px; color: var(--muted); }
       .target img { width: 16px; height: 16px; border-radius: 3px; flex: none; }
@@ -215,7 +223,7 @@
     </div>
 
     <details class="disc reading-only" id="ppp">
-      <summary><span>Pause points <span class="hint" id="pppHint">optional — stop at specific spots</span></span></summary>
+      <summary><span>Pause points <span class="pill" id="pppHint">Optional</span></span></summary>
       <div class="disc-body">
         <label class="file">
           <input type="file" id="preset" accept=".json,application/json" aria-label="Choose a pause-points JSON file" />
