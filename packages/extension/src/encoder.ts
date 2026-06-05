@@ -1,5 +1,6 @@
 /// <reference types="dom-mediacapture-transform" />
 import { Output, Mp4OutputFormat, BufferTarget, CanvasSource, canEncodeVideo } from 'mediabunny';
+import { GIFEncoder, quantize, applyPalette } from 'gifenc';
 
 export interface EncodeParams {
   track: MediaStreamVideoTrack;
@@ -12,6 +13,8 @@ export interface EncodeParams {
   /** Aborted when the scroll has finished — the encoder then finalizes what it has. */
   done: AbortSignal;
   onProgress?: (frame: number) => void;
+  gifFps?: number;
+  gifWidth?: number;
 }
 export interface EncodeResult { buffer: ArrayBuffer; encoder: string }
 
@@ -82,6 +85,72 @@ export async function encodeTabStream(p: EncodeParams): Promise<EncodeResult> {
   }
   await output.finalize();
   return { buffer: output.target.buffer!, encoder: 'webcodecs-avc' };
+}
+
+/**
+ * GIF output: the same live-frame CFR sampling as the MP4 path, but at the lower
+ * gifFps, drawn to a downscaled canvas and palette-quantized per frame. Stops on the
+ * scroll `done` signal (like the MP4 path). GIFs are large / 256-colour — an
+ * alternative, not the default.
+ */
+export async function encodeTabStreamToGif(p: EncodeParams): Promise<EncodeResult> {
+  if (p.track.readyState === 'ended') throw new Error('capture track already ended');
+  const gifFps = p.gifFps ?? 15;
+  const gifW = p.gifWidth ?? 640;
+  const gifH = Math.max(2, Math.round((p.height / p.width) * gifW));
+  const canvas = new OffscreenCanvas(gifW, gifH);
+  const ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: true })!;
+  const gif = GIFEncoder();
+  const delay = Math.round(1000 / gifFps);
+
+  const reader = (new MediaStreamTrackProcessor({ track: p.track }).readable).getReader();
+  let latest: VideoFrame | null = null;
+  let reading = true;
+  const pump = (async () => {
+    try {
+      while (reading) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        latest?.close();
+        latest = value;
+      }
+    } finally {
+      latest?.close();
+      latest = null;
+    }
+  })();
+
+  const slotMs = 1000 / gifFps;
+  const durationS = p.totalFrames / p.fps;             // the scroll's wall-clock length
+  const hardCap = Math.ceil(durationS * gifFps) + Math.ceil(gifFps * 2);
+  const t0 = performance.now();
+  try {
+    for (let n = 0; n < hardCap; n++) {
+      if (p.signal.aborted) throw new Error('aborted');
+      if (p.done.aborted) break;
+      const due = t0 + n * slotMs;
+      const wait = due - performance.now();
+      if (wait > 0) await sleep(wait);
+      if (p.signal.aborted) throw new Error('aborted');
+      if (p.done.aborted) break;
+      if (latest) ctx.drawImage(latest, 0, 0, gifW, gifH);
+      const { data } = ctx.getImageData(0, 0, gifW, gifH);
+      const rgba = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+      const palette = quantize(rgba, 256);
+      const index = applyPalette(rgba, palette);
+      gif.writeFrame(index, gifW, gifH, { palette, delay });
+      p.onProgress?.(n + 1);
+    }
+  } finally {
+    reading = false;
+    reader.cancel().catch(() => undefined);
+    await pump.catch(() => undefined);
+    (latest as VideoFrame | null)?.close();
+    p.track.stop();
+  }
+  gif.finish();
+  const out = gif.bytes();
+  return { buffer: out.slice().buffer, encoder: 'gif' };
 }
 
 /**

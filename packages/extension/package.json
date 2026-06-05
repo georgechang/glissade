@@ -11,8 +11,9 @@
     "typecheck": "wxt prepare && tsc --noEmit"
   },
   "dependencies": {
-    "@page-capture/shared": "*",
     "@page-capture/scroll-engine": "*",
+    "@page-capture/shared": "*",
+    "gifenc": "^1.0.3",
     "mediabunny": "^1.46.0"
   },
   "devDependencies": {
