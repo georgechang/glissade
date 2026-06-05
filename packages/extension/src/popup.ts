@@ -78,8 +78,8 @@ function applyPreset(preset: NormalizedPreset, note: string): void {
   if (preset.profile) { profileSel.value = preset.profile; applyProfile(preset.profile); }
   const n = stops?.length ?? 0;
   presetInfo.textContent =
-    `${note}${preset.name ? ` "${preset.name}"` : ''}: ${pointWord(n)}` +
-    (preset.profile ? `, ${preset.profile} profile` : '');
+    note + (preset.name ? ` — "${preset.name}"` : '') +
+    (preset.profile ? `, ${preset.profile} profile` : ''); // count shown by the badge
   pppHint.textContent = n > 0 ? pointWord(n) : 'Optional';
   pppHint.classList.toggle('loaded', n > 0);
   clearPreset.hidden = n === 0;
@@ -117,7 +117,7 @@ void (async () => {
   if (!key) return;
   const got = await browser.storage.local.get(key);
   const cached = got[key] as NormalizedPreset | undefined;
-  if (cached && (cached.stops?.length || cached.profile)) applyPreset(cached, 'Reusing saved');
+  if (cached && (cached.stops?.length || cached.profile)) applyPreset(cached, 'Saved for this page');
 })();
 
 // Reload note visibility
@@ -184,7 +184,7 @@ $('preset').addEventListener('change', async (ev) => {
   }
   try {
     const preset = normalizePreset(parsed);
-    applyPreset(preset, 'Loaded');
+    applyPreset(preset, 'Loaded from file');
     void savePresetForPage(preset); // cache it for next time on this page
     ($('ppp') as HTMLDetailsElement).open = true; // surface what was just loaded
   } catch {
