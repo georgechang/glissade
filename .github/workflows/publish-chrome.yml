@@ -1,0 +1,132 @@
+# Build the MV3 extension and publish it to the Chrome Web Store.
+#
+# Triggers:
+#   • push a tag like v1.2.3   -> builds, verifies, and PUBLISHES
+#   • manual run (Actions tab)  -> "dry_run" (default ON) verifies auth + build only
+#
+# Required repo secrets (Settings → Secrets and variables → Actions). When they are
+# absent the publish step is skipped with a warning and the built .zip is still
+# uploaded as a workflow artifact — so this also works as a plain build pipeline
+# before the store is wired up. See docs/publishing-chrome-web-store.md for how to
+# obtain each value (the easiest path is `npx wxt submit init` run locally).
+#   CHROME_EXTENSION_ID   – the item's ID from the CWS developer dashboard
+#   CHROME_CLIENT_ID      – Google Cloud OAuth client ID
+#   CHROME_CLIENT_SECRET  – Google Cloud OAuth client secret
+#   CHROME_REFRESH_TOKEN  – OAuth refresh token for the Chrome Web Store API
+#
+# NOTE: the Chrome Web Store rejects re-uploading the same version. Bump
+# packages/extension/package.json "version" (it becomes the manifest version)
+# before tagging a release.
+
+name: Publish to Chrome Web Store
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run — verify auth and build the zip, but do NOT upload or submit"
+        type: boolean
+        default: true
+  push:
+    tags:
+      - "v*"
+
+# Never let two publishes race each other.
+concurrency:
+  group: publish-chrome
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      # Tag pushes always publish for real. Manual runs honor the dry_run toggle.
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The extension imports @page-capture/{shared,scroll-engine} by package name,
+      # so their dist/ must exist before the extension typechecks or builds.
+      - name: Build workspace deps
+        run: npm run build --workspace=@page-capture/shared --workspace=@page-capture/scroll-engine --if-present
+
+      - name: Typecheck (shared + scroll-engine)
+        run: npm run typecheck
+
+      - name: Typecheck (extension)
+        run: npm run typecheck --workspace=@page-capture/extension
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build + zip extension
+        run: npm run zip
+
+      - name: Locate zip
+        id: zip
+        run: |
+          ZIP="$(ls "$GITHUB_WORKSPACE"/packages/extension/.output/*-chrome.zip 2>/dev/null | head -n1)"
+          if [ -z "$ZIP" ]; then
+            echo "::error::No *-chrome.zip found in packages/extension/.output/ — the build/zip step did not produce one."
+            exit 1
+          fi
+          echo "Found: $ZIP"
+          echo "path=$ZIP" >> "$GITHUB_OUTPUT"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: chrome-mv3-zip
+          path: packages/extension/.output/*-chrome.zip
+          if-no-files-found: error
+
+      - name: Check Chrome Web Store secrets
+        id: secrets
+        env:
+          CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+          CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+          CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+          CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+        run: |
+          missing=()
+          for v in CHROME_EXTENSION_ID CHROME_CLIENT_ID CHROME_CLIENT_SECRET CHROME_REFRESH_TOKEN; do
+            if [ -z "${!v}" ]; then missing+=("$v"); fi
+          done
+          if [ "${#missing[@]}" -ne 0 ]; then
+            echo "::warning title=Chrome Web Store not configured::Missing secrets: ${missing[*]}. Skipping publish — the built zip is still available as the 'chrome-mv3-zip' artifact."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to Chrome Web Store
+        if: steps.secrets.outputs.configured == 'true'
+        working-directory: packages/extension
+        env:
+          CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+          CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+          CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+          CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+          CHROME_PUBLISH_TARGET: default
+        run: |
+          args=(submit --chrome-zip "${{ steps.zip.outputs.path }}")
+          if [ "${DRY_RUN}" = "true" ]; then
+            echo "Dry run: verifying auth + zip only (no upload, no submit)."
+            args+=(--dry-run)
+          else
+            echo "Publishing to the Chrome Web Store (publishTarget=default)…"
+          fi
+          npx --no-install wxt "${args[@]}"

@@ -93,6 +93,14 @@ H.264 is unavailable.
   **GPU-capable Chrome** (a no-GPU box can't exercise tabCapture/WebCodecs). Verify the first ~1s shows
   entrance animations (not the old page/blank), then a top dwell, then the scroll at the live speed.
 
+## Publishing
+
+- CI: `.github/workflows/publish-chrome.yml` builds + zips (`wxt zip`) and publishes to the Chrome Web
+  Store via `wxt submit` on a `v*` tag (manual runs default to a dry-run). Needs repo secrets
+  `CHROME_{EXTENSION_ID,CLIENT_ID,CLIENT_SECRET,REFRESH_TOKEN}`; missing → publish is skipped (build still
+  artifacts). **Bump `packages/extension/package.json` version before tagging** (CWS rejects duplicate
+  versions). Full setup: `docs/publishing-chrome-web-store.md`.
+
 ## Working style
 
 - The branch is `feat/chrome-extension`. Commit per logical change; don't commit to `main` without asking.
