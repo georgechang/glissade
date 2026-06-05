@@ -13,7 +13,6 @@
   "dependencies": {
     "@page-capture/scroll-engine": "*",
     "@page-capture/shared": "*",
-    "gifenc": "^1.0.3",
     "mediabunny": "^1.46.0"
   },
   "devDependencies": {

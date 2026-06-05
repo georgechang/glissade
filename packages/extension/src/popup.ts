@@ -6,7 +6,6 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 const status = $('status') as HTMLDivElement;
 const presetInfo = $('presetInfo') as HTMLDivElement;
 const profileSel = $('profile') as HTMLSelectElement;
-const formatSel = $('format') as HTMLSelectElement;
 const easingSel = $('easing') as HTMLSelectElement;
 
 let stops: ScrollStop[] | undefined;
@@ -33,21 +32,15 @@ function applyProfile(name: ProfileName): void {
 
 // Initial values
 applyProfile('medium');
-setNum('gifWidth', 640);
-setNum('gifFps', 15);
 
 profileSel.addEventListener('change', () => {
-  if (profileSel.value !== 'custom') applyProfile(profileSel.value as ProfileName);
+  if (profileSel.value === 'custom') { ($('adv') as HTMLDetailsElement).open = true; return; }
+  applyProfile(profileSel.value as ProfileName);
 });
 // Editing any timing field flips the profile to "custom"
 for (const id of ['pageHold', 'pageScroll', 'velocity', 'holdStart', 'holdEnd', 'easing']) {
   $(id).addEventListener('input', () => { profileSel.value = 'custom'; });
 }
-
-formatSel.addEventListener('change', () => {
-  ($('gifRow') as HTMLDivElement).style.display = formatSel.value === 'gif' ? '' : 'none';
-  if (formatSel.value === 'gif') ($('adv') as HTMLDetailsElement).open = true;
-});
 
 $('preset').addEventListener('change', async (ev) => {
   const file = (ev.target as HTMLInputElement).files?.[0];
@@ -75,7 +68,6 @@ $('go').addEventListener('click', () => {
   const maxH = numVal('maxHeight');
   const optionsInput: Record<string, unknown> = {
     input: { kind: 'url', url: 'https://placeholder.local/' }, // ignored by the extension; satisfies the schema
-    format: formatSel.value,
     fps: Number(($('fps') as HTMLSelectElement).value),
     scrollStyle: ($('style') as HTMLSelectElement).value,
     roundTrip: ($('roundTrip') as HTMLInputElement).checked,
@@ -86,7 +78,6 @@ $('go').addEventListener('click', () => {
     holds: { startMs: numVal('holdStart'), endMs: numVal('holdEnd') },
     hideFixed: ($('hideFixed') as HTMLInputElement).checked,
     reloadBeforeCapture: ($('reload') as HTMLInputElement).checked,
-    quality: { gifWidth: numVal('gifWidth'), gifFps: numVal('gifFps') },
     ...(stops && stops.length ? { stops } : {}),
     ...(maxH > 0 ? { maxHeightPx: maxH } : {}),
   };

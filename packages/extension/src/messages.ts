@@ -5,8 +5,8 @@ export type Msg =
   | { type: 'drive:start'; fps: number; options: unknown }
   // background → offscreen: acquire the tab stream now (consume the fresh streamId), hold it
   | { type: 'capture:acquire'; streamId: string; fps: number }
-  // background → offscreen: encode the held track with these dims/format
-  | { type: 'capture:go'; totalFrames: number; width: number; height: number; format: 'mp4' | 'gif'; gifWidth?: number; gifFps?: number }
+  // background → offscreen: encode the held track with these dims
+  | { type: 'capture:go'; totalFrames: number; width: number; height: number }
   // background → content: begin the wall-clock scroll
   | { type: 'scroll:start'; fps: number }
   // content → background

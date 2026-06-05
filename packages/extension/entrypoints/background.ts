@@ -8,7 +8,7 @@ async function ensureOffscreen(): Promise<void> {
   await browser.offscreen.createDocument({
     url: 'offscreen.html',
     reasons: [browser.offscreen.Reason.USER_MEDIA],
-    justification: 'Encode the captured tab video to MP4/GIF.',
+    justification: 'Encode the captured tab video to MP4.',
   });
 }
 
@@ -93,8 +93,6 @@ async function start(options: unknown): Promise<void> {
   await browser.runtime.sendMessage({
     type: 'capture:go',
     totalFrames: plan.totalFrames, width: plan.width, height: plan.height,
-    format: opts.format,
-    ...(opts.format === 'gif' ? { gifWidth: opts.quality.gifWidth, gifFps: opts.quality.gifFps } : {}),
   } satisfies Msg);
 
   // 5) …and the content script scrolls.

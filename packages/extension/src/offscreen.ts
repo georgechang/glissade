@@ -1,6 +1,6 @@
 import { browser } from 'wxt/browser';
 import { isMessage, type Msg } from './messages';
-import { encodeTabStream, encodeTabStreamToGif, type EncodeParams, type EncodeResult } from './encoder';
+import { encodeTabStream, type EncodeParams, type EncodeResult } from './encoder';
 
 let busy = false;
 let controller = new AbortController();
@@ -56,13 +56,11 @@ async function go(m: Extract<Msg, { type: 'capture:go' }>): Promise<void> {
       track, width: m.width, height: m.height, fps, totalFrames: m.totalFrames,
       signal: controller.signal, done: doneController.signal,
       onProgress: (frame) => browser.runtime.sendMessage({ type: 'capture:progress', frame, totalFrames: m.totalFrames } satisfies Msg).catch(() => {}),
-      ...(m.gifWidth !== undefined ? { gifWidth: m.gifWidth } : {}),
-      ...(m.gifFps !== undefined ? { gifFps: m.gifFps } : {}),
     };
-    const result: EncodeResult = m.format === 'gif' ? await encodeTabStreamToGif(params) : await encodeTabStream(params);
+    const result: EncodeResult = await encodeTabStream(params);
     const { buffer, encoder } = result;
-    const ext = encoder.includes('gif') ? 'gif' : encoder.includes('webm') ? 'webm' : 'mp4';
-    const blobType = ext === 'gif' ? 'image/gif' : ext === 'webm' ? 'video/webm' : 'video/mp4';
+    const ext = encoder.includes('webm') ? 'webm' : 'mp4';
+    const blobType = ext === 'webm' ? 'video/webm' : 'video/mp4';
     const url = URL.createObjectURL(new Blob([buffer], { type: blobType }));
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
     browser.runtime.sendMessage({ type: 'capture:done', ok: true, encoder, url, filename: `page-capture.${ext}` } satisfies Msg).catch(() => {});
