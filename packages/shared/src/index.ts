@@ -129,6 +129,49 @@ export const ScrollStopSchema = z
   );
 export type ScrollStop = z.infer<typeof ScrollStopSchema>;
 
+/** Named timing profiles the UI offers; each populates the reading/continuous timings. */
+export const PROFILE_NAMES = ['slow', 'medium', 'fast'] as const;
+export type ProfileName = (typeof PROFILE_NAMES)[number];
+export interface ProfileTimings {
+  pageHoldMs: number;
+  pageScrollMs: number;
+  velocityVhPerSec: number;
+  holdStartMs: number;
+  holdEndMs: number;
+}
+export const PROFILES: Record<ProfileName, ProfileTimings> = {
+  slow: { pageHoldMs: 1500, pageScrollMs: 3500, velocityVhPerSec: 0.18, holdStartMs: 800, holdEndMs: 1000 },
+  medium: { pageHoldMs: 1000, pageScrollMs: 2800, velocityVhPerSec: 0.275, holdStartMs: 600, holdEndMs: 800 },
+  fast: { pageHoldMs: 600, pageScrollMs: 1400, velocityVhPerSec: 0.5, holdStartMs: 400, holdEndMs: 500 },
+};
+
+/**
+ * An uploadable capture preset. Accepts the legacy stop-config format (a bare array
+ * of stops, e.g. stop-configs/hexagoncom-home.json) OR an extended object that may
+ * also name a target url and a timing profile. Validated against the same ScrollStop
+ * rules as inline stops.
+ */
+export const PresetSchema = z.union([
+  z.array(ScrollStopSchema),
+  z.object({
+    name: z.string().optional(),
+    url: z.string().optional(),
+    profile: z.enum(PROFILE_NAMES).optional(),
+    stops: z.array(ScrollStopSchema).optional(),
+  }),
+]);
+export interface NormalizedPreset {
+  name?: string;
+  url?: string;
+  profile?: ProfileName;
+  stops?: ScrollStop[];
+}
+/** Validate + normalise a parsed JSON preset into a consistent shape. Throws (ZodError) on invalid input. */
+export function normalizePreset(input: unknown): NormalizedPreset {
+  const parsed = PresetSchema.parse(input);
+  return Array.isArray(parsed) ? { stops: parsed } : parsed;
+}
+
 export const CaptureOptionsSchema = z
   .object({
     input: inputSchema,

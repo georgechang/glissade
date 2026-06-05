@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   CaptureOptionsSchema,
   DEFAULTS,
+  PROFILES,
+  normalizePreset,
   type CaptureOptions,
 } from '@page-capture/shared';
 
@@ -159,5 +161,28 @@ describe('CaptureOptionsSchema — stops', () => {
 
   it('rejects an out-of-range percent', () => {
     expect(withStops([{ percent: 140 }]).success).toBe(false);
+  });
+});
+
+describe('PROFILES', () => {
+  it('defines slow/medium/fast and medium matches the defaults', () => {
+    expect(Object.keys(PROFILES)).toEqual(['slow', 'medium', 'fast']);
+    expect(PROFILES.medium.pageHoldMs).toBe(DEFAULTS.pageHoldMs);
+    expect(PROFILES.medium.velocityVhPerSec).toBe(DEFAULTS.velocityVhPerSec);
+    expect(PROFILES.slow.pageScrollMs).toBeGreaterThan(PROFILES.fast.pageScrollMs);
+  });
+});
+
+describe('normalizePreset', () => {
+  it('accepts the legacy bare stop-array format', () => {
+    const out = normalizePreset([{ selector: '#hero', holdMs: 2000 }, { percent: 50 }]);
+    expect(out.stops).toEqual([{ selector: '#hero', holdMs: 2000 }, { percent: 50 }]);
+  });
+  it('accepts an extended object with profile + stops', () => {
+    const out = normalizePreset({ name: 'hex', url: 'https://hexagon.com', profile: 'slow', stops: [{ offset: 100 }] });
+    expect(out).toEqual({ name: 'hex', url: 'https://hexagon.com', profile: 'slow', stops: [{ offset: 100 }] });
+  });
+  it('rejects an invalid stop (two locators)', () => {
+    expect(() => normalizePreset([{ selector: '#x', offset: 10 }])).toThrow();
   });
 });
