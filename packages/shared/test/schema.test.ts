@@ -3,6 +3,7 @@ import {
   CaptureOptionsSchema,
   DEFAULTS,
   PROFILES,
+  defaultEasingForStyle,
   normalizePreset,
   type CaptureOptions,
 } from '@page-capture/shared';
@@ -170,6 +171,16 @@ describe('PROFILES', () => {
     expect(PROFILES.medium.pageHoldMs).toBe(DEFAULTS.pageHoldMs);
     expect(PROFILES.medium.velocityVhPerSec).toBe(DEFAULTS.velocityVhPerSec);
     expect(PROFILES.slow.pageScrollMs).toBeGreaterThan(PROFILES.fast.pageScrollMs);
+  });
+});
+
+describe('defaultEasingForStyle', () => {
+  it('defaults continuous to a smooth, steady linear glide (no mid-scroll rush)', () => {
+    expect(defaultEasingForStyle('continuous')).toBe('linear');
+  });
+  it('defaults reading to ease-in-out per screen-step (== the global default)', () => {
+    expect(defaultEasingForStyle('reading')).toBe('easeInOut');
+    expect(defaultEasingForStyle('reading')).toBe(DEFAULTS.easing);
   });
 });
 

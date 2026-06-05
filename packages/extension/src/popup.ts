@@ -1,7 +1,7 @@
 import { browser } from 'wxt/browser';
 import {
-  CaptureOptionsSchema, EASINGS, PROFILES, normalizePreset,
-  type NormalizedPreset, type ProfileName, type ScrollStop,
+  CaptureOptionsSchema, EASINGS, PROFILES, defaultEasingForStyle, normalizePreset,
+  type NormalizedPreset, type ProfileName, type ScrollStop, type ScrollStyle,
 } from '@page-capture/shared';
 import { isMessage } from './messages';
 
@@ -19,13 +19,14 @@ const clearPreset = $('clearPreset') as HTMLButtonElement;
 let stops: ScrollStop[] | undefined;
 let recording = false;
 let cancelTimer: ReturnType<typeof setTimeout> | undefined;
+let easingUserSet = false; // once the user picks an easing, stop auto-defaulting it per style
 
 const numVal = (id: string) => Number(($(id) as HTMLInputElement).value);
 const setNum = (id: string, v: number) => { ($(id) as HTMLInputElement).value = String(v); };
 
 // Easing options
 const EASING_LABELS: Record<string, string> = {
-  linear: 'Linear',
+  linear: 'Linear (steady)',
   easeIn: 'Ease in',
   easeOut: 'Ease out',
   easeInOut: 'Ease in-out',
@@ -35,9 +36,9 @@ const EASING_LABELS: Record<string, string> = {
 for (const e of EASINGS) {
   const o = document.createElement('option');
   o.value = e; o.textContent = EASING_LABELS[e] ?? e;
-  if (e === 'easeInOut') o.selected = true;
   easingSel.append(o);
 }
+// Initial selection is set by syncEasingDefault() once the style control exists.
 
 function applyProfile(name: ProfileName): void {
   const p = PROFILES[name];
@@ -53,10 +54,13 @@ profileSel.addEventListener('change', () => {
   if (profileSel.value === 'custom') { ($('adv') as HTMLDetailsElement).open = true; return; }
   applyProfile(profileSel.value as ProfileName);
 });
-// Editing any timing field flips the profile to "custom"
-for (const id of ['pageHold', 'pageScroll', 'velocity', 'holdEnd', 'easing']) {
+// Editing any timing field flips the speed profile to "custom"
+for (const id of ['pageHold', 'pageScroll', 'velocity', 'holdEnd']) {
   $(id).addEventListener('input', () => { profileSel.value = 'custom'; });
 }
+// Easing is orthogonal to the speed profile and defaults per style (see
+// syncEasingDefault); a manual pick sticks across style changes.
+easingSel.addEventListener('change', () => { easingUserSet = true; });
 
 // --- Per-page preset cache (chrome.storage.local, keyed by origin+pathname) ---
 async function currentPageKey(): Promise<string | null> {
@@ -134,8 +138,15 @@ const syncStyleKnobs = () => {
   document.querySelectorAll<HTMLElement>('.reading-only').forEach((el) => { el.style.display = reading ? '' : 'none'; });
   document.querySelectorAll<HTMLElement>('.continuous-only').forEach((el) => { el.style.display = reading ? 'none' : ''; });
 };
-styleSel.addEventListener('change', syncStyleKnobs);
+// Continuous eases across the whole page (ease-in-out rushes the middle), so it
+// defaults to a smooth, steady linear glide; reading keeps ease-in-out per
+// screen-step. Skipped once the user has chosen an easing themselves.
+const syncEasingDefault = () => {
+  if (!easingUserSet) easingSel.value = defaultEasingForStyle(styleSel.value as ScrollStyle);
+};
+styleSel.addEventListener('change', () => { syncStyleKnobs(); syncEasingDefault(); });
 syncStyleKnobs();
+syncEasingDefault();
 
 // On open: populate the target chip and guard Record button for uncapturable pages.
 void (async () => {

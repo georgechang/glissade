@@ -148,6 +148,18 @@ export const PROFILES: Record<ProfileName, ProfileTimings> = {
 };
 
 /**
+ * The easing whose *feel* suits each scroll style by default. Continuous style
+ * eases across the WHOLE page in one pass, so ease-in-out peaks well above the
+ * average speed mid-scroll — it rushes the middle. A linear (constant-velocity)
+ * glide reads as smooth and even, so continuous defaults to it. Reading style
+ * eases each one-screen step instead, where ease-in-out looks natural. This is
+ * only the *default* — callers (e.g. the popup's Easing control) may override it.
+ */
+export function defaultEasingForStyle(style: ScrollStyle): EasingName {
+  return style === 'continuous' ? 'linear' : DEFAULTS.easing;
+}
+
+/**
  * An uploadable capture preset. Accepts the legacy stop-config format (a bare array
  * of stops, e.g. stop-configs/hexagoncom-home.json) OR an extended object that may
  * also name a target url and a timing profile. Validated against the same ScrollStop
