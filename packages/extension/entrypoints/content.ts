@@ -19,10 +19,10 @@ export default defineContentScript({
       void prepareAndReportPlan(raw.fps, raw.options).then(sendResponse);
       return true; // async sendResponse
     });
-    // capture:start → run the wall-clock scroll
+    // scroll:start → run the wall-clock scroll
     browser.runtime.onMessage.addListener((raw) => {
       if (!isMessage(raw)) return;
-      if (raw.type === 'capture:start' && lastPlan) void drive(raw.fps, lastPlan);
+      if (raw.type === 'scroll:start' && lastPlan) void drive(raw.fps, lastPlan);
       else if (raw.type === 'abort') driveAborted = true;
     });
   },

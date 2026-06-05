@@ -3,8 +3,6 @@ export type Msg =
   | { type: 'ui:start'; options: unknown } // options validated by zod in the popup
   // background → content
   | { type: 'drive:start'; fps: number; options: unknown }
-  // content → background (plan measured) ; background → offscreen
-  | { type: 'capture:start'; streamId: string; fps: number; totalFrames: number; width: number; height: number } // DEPRECATED: replaced by capture:acquire+capture:go (offscreen) / scroll:start (content); removed after migration
   // background → offscreen: acquire the tab stream now (consume the fresh streamId), hold it
   | { type: 'capture:acquire'; streamId: string; fps: number }
   // background → offscreen: encode the held track with these dims/format
@@ -22,7 +20,7 @@ export type Msg =
   | { type: 'abort' };
 
 const TYPES = new Set<Msg['type']>([
-  'ui:start', 'drive:start', 'capture:start', 'capture:acquire', 'capture:go', 'scroll:start', 'drive:done', 'drive:progress',
+  'ui:start', 'drive:start', 'capture:acquire', 'capture:go', 'scroll:start', 'drive:done', 'drive:progress',
   'capture:done', 'capture:progress', 'abort',
 ]);
 

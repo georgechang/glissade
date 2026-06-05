@@ -218,6 +218,8 @@ export const CaptureOptionsSchema = z
     userAgent: z.string().optional(),
     respectReducedMotion: z.boolean().default(false),
     hideFixed: z.boolean().default(false),
+    /** Reload the page before recording so scroll-triggered animations re-arm (URL/extension). */
+    reloadBeforeCapture: z.boolean().default(true),
     /** Cap travel for infinite-scroll pages (CSS px of content height). */
     maxHeightPx: z.number().int().positive().optional(),
     quality: z
