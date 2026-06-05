@@ -44,6 +44,16 @@ On Record, the extension grabs the tab-capture stream immediately (while the cli
 
 **Runtime bets to confirm (Chromium implementation details, not spec guarantees):** (1) the capture stream must survive the reload — if it doesn't, the capture aborts with "capture track already ended"; (2) first paint must land before the signature entrance animation (FCP can fire on early text before a hero/LCP element animates — on some sites a hero animation gated behind font/image load may still be clipped). Record 2-3 animation-heavy sites and inspect the first second of frames; tell me if anything's off and I'll adjust the gate (e.g. LCP-based or a small delay).
 
+## Also verify (UX pass)
+- **Page guard:** open the popup on a `chrome://`, Web Store, or `file://` tab — Record is disabled with "only records normal web pages".
+- **Target chip:** the popup shows the favicon + host of the tab that will be recorded.
+- **Reload toggle (main surface):** the "Reload page first" checkbox + data-loss caption are on the main view; UNCHECK it and confirm the page is NOT reloaded (records the current state); leave it checked and confirm it reloads.
+- **Phase status + REC badge:** during capture the status shows "Reloading page…" → "Recording…" → "Recording N/total…"; the toolbar icon shows a red **REC** badge that clears when done.
+- **Completion notification:** with the popup CLOSED, a system notification reports "Saved <name>" (host+date filename) or "Capture failed: <reason>". User-cancel does NOT fire a failure notification.
+- **Style-aware Advanced:** reading shows Page hold/scroll (no Velocity); continuous shows Velocity (no Page hold/scroll).
+- **Cancel:** the red Cancel button stops the capture and can't get stuck (4s fallback).
+- **Accessibility:** Tab through every control (each has a name); info ⓘ buttons are focusable and Esc-dismissible; the status line is announced.
+
 ## Known limitations (expected, not bugs)
 - ~60 fps is best-effort (auto-throttles under load; reclocked to CFR by duplicating frames).
 - Must keep the captured tab foreground/focused for the whole scroll.
