@@ -63,17 +63,19 @@ export const DEFAULTS = {
   scrollStyle: 'reading',
   roundTrip: false,
   /** Reading style: dwell on each screen (ms). */
-  pageHoldMs: 1000,
+  pageHoldMs: 1500,
   /** Reading style: glide time between screens (ms). A slow, deliberate pace. */
-  pageScrollMs: 2800,
+  pageScrollMs: 4000,
   /** Reading style: fraction of a viewport advanced per page. */
   pageFraction: 1,
   /** Scroll speed in viewport-heights per second (continuous style). */
-  velocityVhPerSec: 0.275,
+  velocityVhPerSec: 0.18,
   minDurationS: 5,
-  maxDurationS: 15,
-  holdStartMs: 600,
-  holdEndMs: 800,
+  // Upper clamp on continuous-style scroll duration. Raised so the slower profile
+  // velocities are actually realized on tall pages instead of saturating the cap.
+  maxDurationS: 24,
+  holdStartMs: 900,
+  holdEndMs: 1100,
   urlMode: 'animate',
   warmup: 'images',
   waitUntil: 'networkidle',
@@ -140,9 +142,9 @@ export interface ProfileTimings {
   holdEndMs: number;
 }
 export const PROFILES: Record<ProfileName, ProfileTimings> = {
-  slow: { pageHoldMs: 1500, pageScrollMs: 3500, velocityVhPerSec: 0.18, holdStartMs: 800, holdEndMs: 1000 },
-  medium: { pageHoldMs: 1000, pageScrollMs: 2800, velocityVhPerSec: 0.275, holdStartMs: 600, holdEndMs: 800 },
-  fast: { pageHoldMs: 600, pageScrollMs: 1400, velocityVhPerSec: 0.5, holdStartMs: 400, holdEndMs: 500 },
+  slow: { pageHoldMs: 2200, pageScrollMs: 5200, velocityVhPerSec: 0.11, holdStartMs: 1200, holdEndMs: 1500 },
+  medium: { pageHoldMs: 1500, pageScrollMs: 4000, velocityVhPerSec: 0.18, holdStartMs: 900, holdEndMs: 1100 },
+  fast: { pageHoldMs: 900, pageScrollMs: 2200, velocityVhPerSec: 0.30, holdStartMs: 600, holdEndMs: 750 },
 };
 
 /**

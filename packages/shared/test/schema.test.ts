@@ -21,7 +21,7 @@ describe('CaptureOptionsSchema', () => {
     expect(parsed.warmup).toBe('images');
     expect(parsed.scrollStyle).toBe('reading');
     expect(parsed.roundTrip).toBe(false);
-    expect(parsed.pageHoldMs).toBe(1000);
+    expect(parsed.pageHoldMs).toBe(DEFAULTS.pageHoldMs);
   });
 
   it('accepts an image path request and an overridden format', () => {
