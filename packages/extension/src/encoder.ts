@@ -75,6 +75,12 @@ export async function encodeTabStream(p: EncodeParams): Promise<EncodeResult> {
   const slotMs = 1000 / p.fps;
   const FIXED_SAFETY = 600 * p.fps; // 20-min absolute backstop; drive:done + capture:bound are the real stops
   const t0 = performance.now();
+  // Stamp each frame with its REAL elapsed time, not n/fps. The loop is paced to
+  // ~fps, but if encoding can't sustain fps (e.g. large/HiDPI frames) the loop
+  // falls behind real time; using n/fps then compresses the timeline so playback
+  // runs faster than the live scroll. Real timestamps keep the output duration ==
+  // the actual capture duration (Mediabunny normalizes them to the fps grid).
+  let lastStamp = -1;
   try {
     for (let n = 0; ; n++) {
       if (n >= Math.min(p.maxFramesRef?.current ?? FIXED_SAFETY, FIXED_SAFETY)) break;
@@ -86,7 +92,9 @@ export async function encodeTabStream(p: EncodeParams): Promise<EncodeResult> {
       if (p.signal.aborted) throw new Error('aborted');
       if (p.done.aborted) break;
       if (latest) ctx.drawImage(latest, 0, 0, W, H);
-      await source.add(n / p.fps, 1 / p.fps);
+      const stamp = Math.max((performance.now() - t0) / 1000, lastStamp + slotMs / 4000); // real elapsed, strictly increasing
+      lastStamp = stamp;
+      await source.add(stamp, 1 / p.fps);
       p.onProgress?.(n + 1);
     }
   } finally {
