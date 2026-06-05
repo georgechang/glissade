@@ -8,4 +8,9 @@ describe('isMessage', () => {
     expect(isMessage({ type: 'nope' })).toBe(false);
     expect(isMessage(null)).toBe(false);
   });
+
+  it('accepts a capture:go message', () => {
+    const m: Msg = { type: 'capture:go', totalFrames: 90, width: 1920, height: 1080, format: 'mp4' };
+    expect(isMessage(m)).toBe(true);
+  });
 });
