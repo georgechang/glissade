@@ -4,21 +4,81 @@
     <meta charset="utf-8" />
     <title>Page Capture</title>
     <style>
-      body { font: 13px system-ui; width: 260px; padding: 12px; }
-      label { display: block; margin: 6px 0; }
-      input, select { width: 100%; }
-      #go { margin-top: 10px; width: 100%; padding: 6px; }
-      #status { margin-top: 8px; color: #555; min-height: 1em; }
+      body { font: 13px system-ui, sans-serif; width: 300px; padding: 12px; margin: 0; }
+      h1 { font-size: 14px; margin: 0 0 10px; }
+      label { display: block; margin: 8px 0 2px; font-weight: 500; }
+      .row { display: flex; gap: 8px; }
+      .row > div { flex: 1; }
+      input, select { width: 100%; box-sizing: border-box; }
+      .chk { display: flex; align-items: center; gap: 6px; font-weight: 400; margin: 8px 0; }
+      .chk input { width: auto; }
+      details { margin-top: 10px; border-top: 1px solid #eee; padding-top: 6px; }
+      summary { cursor: pointer; font-weight: 600; }
+      #go { margin-top: 12px; width: 100%; padding: 8px; font-weight: 600; }
+      #status { margin-top: 8px; color: #555; min-height: 1.2em; }
+      .hint { color: #888; font-weight: 400; font-size: 11px; }
     </style>
   </head>
   <body>
-    <label>Style
-      <select id="style"><option value="reading">reading</option><option value="continuous">continuous</option></select>
-    </label>
-    <label>FPS
-      <select id="fps"><option>30</option><option>60</option></select>
-    </label>
-    <label><input type="checkbox" id="roundTrip" /> round trip</label>
+    <h1>Page Capture — scroll to video</h1>
+
+    <div class="row">
+      <div>
+        <label>Profile</label>
+        <select id="profile">
+          <option value="slow">Slow</option>
+          <option value="medium" selected>Medium</option>
+          <option value="fast">Fast</option>
+          <option value="custom">Custom</option>
+        </select>
+      </div>
+      <div>
+        <label>Format</label>
+        <select id="format"><option value="mp4">MP4</option><option value="gif">GIF</option></select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Style</label>
+        <select id="style"><option value="reading">reading</option><option value="continuous">continuous</option></select>
+      </div>
+      <div>
+        <label>&nbsp;</label>
+        <label class="chk"><input type="checkbox" id="roundTrip" /> round trip</label>
+      </div>
+    </div>
+
+    <label>Preset (stops .json) <span class="hint">optional</span></label>
+    <input type="file" id="preset" accept=".json,application/json" />
+    <div id="presetInfo" class="hint"></div>
+
+    <details id="adv">
+      <summary>Advanced</summary>
+      <div class="row">
+        <div><label>FPS</label><select id="fps"><option>30</option><option>60</option></select></div>
+        <div><label>Easing</label><select id="easing"></select></div>
+      </div>
+      <div class="row">
+        <div><label>Page hold (ms)</label><input type="number" id="pageHold" min="0" /></div>
+        <div><label>Page scroll (ms)</label><input type="number" id="pageScroll" min="0" /></div>
+      </div>
+      <div class="row">
+        <div><label>Velocity (vh/s)</label><input type="number" id="velocity" min="0" step="0.01" /></div>
+        <div><label>Max height (px)</label><input type="number" id="maxHeight" min="0" placeholder="auto" /></div>
+      </div>
+      <div class="row">
+        <div><label>Hold start (ms)</label><input type="number" id="holdStart" min="0" /></div>
+        <div><label>Hold end (ms)</label><input type="number" id="holdEnd" min="0" /></div>
+      </div>
+      <div class="row" id="gifRow" style="display:none">
+        <div><label>GIF width (px)</label><input type="number" id="gifWidth" min="64" /></div>
+        <div><label>GIF fps</label><input type="number" id="gifFps" min="1" max="50" /></div>
+      </div>
+      <label class="chk"><input type="checkbox" id="hideFixed" /> hide fixed/sticky elements</label>
+      <label class="chk"><input type="checkbox" id="reload" checked /> reload page first</label>
+    </details>
+
     <button id="go">Record this tab</button>
     <div id="status"></div>
     <script type="module" src="../src/popup.ts"></script>
