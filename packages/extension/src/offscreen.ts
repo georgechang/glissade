@@ -1,47 +1,66 @@
 import { browser } from 'wxt/browser';
 import { isMessage, type Msg } from './messages';
-import { encodeTabStream } from './encoder';
+import { encodeTabStream, encodeTabStreamToGif, type EncodeParams, type EncodeResult } from './encoder';
 
 let busy = false;
 let controller = new AbortController();
 let doneController = new AbortController();
+let held: { track: MediaStreamVideoTrack; fps: number } | null = null;
 
 browser.runtime.onMessage.addListener((raw) => {
   if (!isMessage(raw)) return;
   if (raw.type === 'abort') { controller.abort(); return; }
   if (raw.type === 'drive:done') { doneController.abort(); return; }
-  if (raw.type !== 'capture:start') return;
-  void run(raw);
+  if (raw.type === 'capture:acquire') { void acquire(raw); return; }
+  if (raw.type === 'capture:go') { void go(raw); return; }
 });
 
-async function run(m: Extract<Msg, { type: 'capture:start' }>): Promise<void> {
-  if (busy) return;
-  busy = true;
+// Phase 1: grab the tab stream now (the streamId is freshest right after the user
+// gesture) and hold the track. The track keeps capturing across the page reload that
+// the background performs next; we don't start reading frames until GO.
+async function acquire(m: Extract<Msg, { type: 'capture:acquire' }>): Promise<void> {
   controller = new AbortController();
   doneController = new AbortController();
+  busy = false;
+  held = null;
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: m.streamId,
-        maxWidth: m.width, maxHeight: m.height, maxFrameRate: m.fps } } as MediaTrackConstraints,
+      video: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: m.streamId, maxFrameRate: m.fps } } as MediaTrackConstraints,
     });
     const track = stream.getVideoTracks()[0] as MediaStreamVideoTrack;
     track.addEventListener('ended', () => controller.abort());
-    const { buffer, encoder } = await encodeTabStream({
-      track, width: m.width, height: m.height, fps: m.fps, totalFrames: m.totalFrames,
-      signal: controller.signal,
-      done: doneController.signal,
+    held = { track, fps: m.fps };
+  } catch (e) {
+    held = null;
+    browser.runtime.sendMessage({ type: 'capture:done', ok: false, error: `capture: ${(e as Error).message}` } satisfies Msg).catch(() => {});
+  }
+}
+
+// Phase 2: encode the held track (the page has been reloaded + measured by now).
+async function go(m: Extract<Msg, { type: 'capture:go' }>): Promise<void> {
+  if (busy) return;
+  if (!held) {
+    browser.runtime.sendMessage({ type: 'capture:done', ok: false, error: 'no captured stream (acquire failed?)' } satisfies Msg).catch(() => {});
+    return;
+  }
+  busy = true;
+  const { track, fps } = held;
+  held = null;
+  try {
+    const params: EncodeParams = {
+      track, width: m.width, height: m.height, fps, totalFrames: m.totalFrames,
+      signal: controller.signal, done: doneController.signal,
       onProgress: (frame) => browser.runtime.sendMessage({ type: 'capture:progress', frame, totalFrames: m.totalFrames } satisfies Msg).catch(() => {}),
-    });
-    const isWebm = encoder.includes('webm');
-    const blobType = isWebm ? 'video/webm' : 'video/mp4';
-    const filename = isWebm ? 'page-capture.webm' : 'page-capture.mp4';
-    // chrome.downloads is NOT exposed to offscreen documents — create the blob URL
-    // here (offscreen has DOM + URL) and hand it to the background service worker,
-    // which owns chrome.downloads. This doc stays alive so the URL resolves; revoke
-    // after a delay, by which point the download has been fetched.
+      ...(m.gifWidth !== undefined ? { gifWidth: m.gifWidth } : {}),
+      ...(m.gifFps !== undefined ? { gifFps: m.gifFps } : {}),
+    };
+    const result: EncodeResult = m.format === 'gif' ? await encodeTabStreamToGif(params) : await encodeTabStream(params);
+    const { buffer, encoder } = result;
+    const ext = encoder.includes('gif') ? 'gif' : encoder.includes('webm') ? 'webm' : 'mp4';
+    const blobType = ext === 'gif' ? 'image/gif' : ext === 'webm' ? 'video/webm' : 'video/mp4';
     const url = URL.createObjectURL(new Blob([buffer], { type: blobType }));
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    browser.runtime.sendMessage({ type: 'capture:done', ok: true, encoder, url, filename } satisfies Msg).catch(() => {});
+    browser.runtime.sendMessage({ type: 'capture:done', ok: true, encoder, url, filename: `page-capture.${ext}` } satisfies Msg).catch(() => {});
   } catch (e) {
     browser.runtime.sendMessage({ type: 'capture:done', ok: false, error: (e as Error).message } satisfies Msg).catch(() => {});
   } finally {
