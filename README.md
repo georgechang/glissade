@@ -1,168 +1,141 @@
-# page-capture
+# Glissade
 
-Turn a **screenshot** or a **URL** into a smooth **scrolling animation** (MP4 or GIF) — for demos, docs, presentations, marketing/social clips, design reviews, and other assets. For URLs it drives a real browser, so **scroll-triggered animations** (IntersectionObserver, AOS, GSAP ScrollTrigger, lazy reveals) are captured faithfully.
+Record the active browser tab **scrolling down a page** into a smooth **H.264 MP4** — captured
+right in your real browser, with no server and no upload.
 
-```
-page-capture ./tall-screenshot.png -o scroll.mp4
-page-capture https://example.com -o site.mp4 --width 1920 --height 1080
-page-capture https://example.com -o site.gif --format gif
-```
+Glissade is a Chrome (Manifest V3) extension. Open any page, hit record, and it reloads the tab,
+starts filming at the new page's first paint (so the entrance/on-load animations are in the clip),
+then scrolls the page on a smooth, eased clock. Because it's recording your actual
+GPU-composited tab, **scroll-triggered animations** (IntersectionObserver, AOS, GSAP ScrollTrigger,
+lazy reveals), `<video>`, and WebGL are all captured faithfully.
 
-## Why
+Useful for demos, product walkthroughs, docs, presentations, marketing/social clips, design
+reviews, or archiving how a page looks and moves.
 
-A slide that shows a product page "scrolling" is far more compelling than a static screenshot. `page-capture` produces that clip deterministically: smooth ease-in-out motion, brief holds at the top and bottom, exact duration, and broadly-compatible H.264 (plays in QuickTime, PowerPoint, Keynote, Google Slides).
+## Why an extension
 
-## How it works
+Recording your real tab gets you the things a headless/server renderer struggles with — true
+~60fps, the proprietary codecs that make `<video>` play, real WebGL on a real GPU, and your
+logged-in / behind-Cloudflare sessions — for free. Everything runs **100% client-side**: capture,
+H.264 encoding, and download all happen on your machine. Nothing is uploaded; there's no server and
+no telemetry.
 
-- **Reading-style scroll by default.** It scrolls one screen, pauses ~1s to "read", then scrolls on — the way a person actually reads down a page. Switch to one smooth glide with `--scroll-style continuous`, or have it scroll back up afterward with `--round-trip`.
-- **Deterministic per-frame stepping.** Rather than recording a live screencast (which drops frames and stutters), the engine computes an eased scroll offset for each frame, scrolls there, lets the page settle, and screenshots. Scroll-triggered animations fire on scroll *position*, so stepping reproduces them faithfully — while keeping the output smooth and exactly the requested length. (Time-based animations triggered on reveal advance in real time between frames, so on very fast scrolls they can appear brief; slow the scroll — `--page-hold`/`--page-scroll`/`--velocity` — to give them room.)
-- **One shared motion engine, two frame sources.** Image mode decodes the screenshot once and pans a zero-copy window down it. URL mode drives Chromium. Both feed the same encoder.
-- **Bundled ffmpeg.** Encoding uses `ffmpeg-static` (H.264/`yuv420p` MP4 by default; optional two-pass-palette GIF). No system ffmpeg or Chrome required.
-
-## Requirements
-
-- Node.js ≥ 20 (developed on Node 24).
-- No system **ffmpeg** needed (bundled via `ffmpeg-static`).
-- A Chromium browser for URL mode. `npm install` provisions it via Playwright; if missing, run `npx playwright install chromium`. (Image mode needs no browser.)
-
-## Install & build
+## Install (load unpacked)
 
 ```bash
 npm install
 npm run build
-# then:
-node packages/cli/dist/main.js --help
 ```
 
-## Usage
+Then in Chrome: `chrome://extensions` → enable **Developer mode** → **Load unpacked** → select
+`packages/extension/.output/chrome-mv3`. After each rebuild, click the extension's **reload ↻**.
 
-```
-page-capture <input> [options]
-```
+(For end users it ships via the Chrome Web Store / enterprise force-install — see [Publishing](#publishing).)
 
-`<input>` is an `http(s)://` URL or a path to a tall screenshot (`.png/.jpg/.jpeg/.webp/...`).
+## Using it
 
-Common options (run `--help` for the full list):
+Click the toolbar icon to open the popup:
 
-| Option | Default | Notes |
-|---|---|---|
-| `-o, --output <file>` | `capture.mp4` | format inferred from extension if `--format` omitted |
-| `-f, --format <mp4\|gif>` | `mp4` | GIF is larger; a warning is printed |
-| `--width` / `--height` | `1920` / `1080` | output dimensions (forced even) |
-| `--fps <n>` | `30` | use `60` for fast scrolls |
-| `--scroll-style <reading\|continuous>` | `reading` | `reading` pauses on each screen; `continuous` is one glide |
-| `--round-trip` | off | after the bottom, scroll back up to the top |
-| `--page-hold <ms>` | `1000` | *reading*: dwell on each screen |
-| `--page-scroll <ms>` | `2800` | *reading*: glide time between screens |
-| `--stops <list>` | — | *reading*: explicit pause points, e.g. `"#hero@2000, 1200, 66%, footer"` |
-| `--stops-file <path>` | — | *reading*: JSON `[{ selector\|offset\|percent, holdMs? }]` (not combinable with `--stops`) |
-| `--duration <s>` | auto | *continuous*: total scroll time (overrides `--velocity`) |
-| `--velocity <vh/s>` | `0.275` | *continuous*: scroll speed in viewport-heights per second |
-| `--easing <name>` | `easeInOut` | `linear`, `easeInOutSine`, `smoothstep`, … |
-| `--hold-start` / `--hold-end <ms>` | `600` / `800` | holds at the very top / very end |
-| `--mode <animate\|static>` | `animate` | URL only; `static` = one screenshot, panned |
-| `--warmup <images\|none\|full>` | `images` | URL only; `images` loads lazy media without scrolling (keeps scroll reveals); `none` records cold; `full` pre-scrolls (consumes once-only reveals) |
-| `--scale <n>` | `1` | deviceScaleFactor; `>1` supersamples for crisper text |
-| `--hide-fixed` | off | neutralize sticky/fixed elements |
-| `--max-height <px>` | — | cap travel for infinite-scroll pages |
+- **Speed** — *Slow / Medium / Fast* presets set the pacing (dwell + scroll speed). Pick **Custom**
+  to hand-tune everything in **Advanced**.
+- **Style** — **Reading** scrolls one screen, pauses to "read", then continues, the way a person
+  reads down a page. **Continuous** is one smooth glide from top to bottom.
+- **Round trip** — after reaching the bottom, scroll back up to the top before finishing.
+- **Reload page first** *(on by default)* — reloads the tab so on-load/entrance animations replay
+  and scroll reveals re-arm; recording begins at the new page's first paint so the intro is
+  captured. (Unsaved changes on the tab are lost.)
+- **Pause points** *(reading style)* — optionally upload a `.json` file to dwell at specific spots
+  (see below).
+- **Advanced** — FPS (30/60), easing curve, per-screen page-hold/page-scroll times (reading), scroll
+  velocity (continuous), a max scroll height for very tall/infinite pages, an end hold, and a toggle
+  to hide fixed/sticky elements while scrolling.
 
-### Examples
+Press **Record this tab** and keep that tab in the foreground for the whole scroll. The button
+becomes **Cancel** while recording, a red **REC** badge shows on the icon, and the MP4 downloads
+when it's done (with a completion notification if the popup is closed).
 
-```bash
-# Image → 1080p MP4 (default: reading style — pauses on each screen)
-page-capture ./landing-fullpage.png -o landing.mp4
+Defaults worth knowing: reading style eases each screen-step (ease-in-out); **continuous defaults to
+a steady linear glide** so it doesn't rush through the middle. Your last uploaded pause-points file
+is remembered per page URL.
 
-# URL, reading style, scroll down then back up, capturing reveals cold
-page-capture https://example.com -o site.mp4 --round-trip --warmup none
+## Pause points (optional)
 
-# Linger longer on each screen (1.5s) and glide a bit slower between them
-page-capture https://example.com -o site.mp4 --page-hold 1500 --page-scroll 900
-
-# One smooth continuous glide instead of pausing per screen
-page-capture https://example.com -o site.mp4 --scroll-style continuous --duration 8
-
-# Pause at specific points (reading style). Each token is a CSS selector,
-# a pixel offset, or a percent; optional @ms sets a per-stop dwell.
-page-capture https://example.com -o site.mp4 --stops "#hero@2500, .pricing, 66%, footer"
-# …or author them in a file (not combinable with --stops):
-page-capture https://example.com -o site.mp4 --stops-file stops.json
-
-# Image → GIF (downscaled), supersampled for crisp text
-page-capture ./tall.png -o tall.gif --format gif --gif-width 720 --scale 2
-```
-
-### Pause points (reading style)
-
-By default reading mode pauses every screen. To control exactly where it pauses, give it `--stops` (inline) or `--stops-file` (JSON) — **not both**. Each stop is one of:
-
-- a **CSS selector** (`#hero`, `.pricing`, `footer`) — resolved in the live page; the element's top is scrolled to the top of the viewport (most robust);
-- a **pixel offset** (`1200` or `1200px`) — an exact `scrollY`;
-- a **percent** (`66%`) — of the scrollable distance.
-
-Inline, append `@<ms>` to set a per-stop dwell; otherwise `--page-hold` is used. The points replace the automatic every-screen stops, are sorted/clamped/de-duplicated, and the scroll **starts at the top and ends at your last stop** (include `footer`/`100%` to reach the bottom). `--round-trip` plays them in reverse on the way back up. Unresolved selectors are warned about and skipped. (Selectors need a live DOM, so they apply to URL mode; image/`--mode static` accept offset/percent.)
+In reading style you can upload a `.json` array of pause points — each is scrolled to the top of the
+viewport and held:
 
 ```json
-// stops.json
 [
-  { "selector": "#hero",   "holdMs": 2500 },
+  { "selector": "#hero", "holdMs": 2000 },
   { "percent": 40 },
-  { "offset": 3200,        "holdMs": 800 },
-  { "selector": "footer" }
+  { "offset": 1200 }
 ]
 ```
 
-## Programmatic API
+Each point gives exactly one of a CSS `selector`, a `percent` (0–100) of the page, or a pixel
+`offset`; the optional `holdMs` overrides the default dwell. An extended form
+`{ "name": "…", "profile": "slow", "stops": [ … ] }` is also accepted and may carry a speed profile.
 
-The engine is a framework-agnostic library (`@page-capture/core`):
+## How it works
 
-```ts
-import { capture } from '@page-capture/core';
-import { createWriteStream } from 'node:fs';
+Four contexts coordinate over one typed message protocol:
 
-await capture(
-  { input: { kind: 'url', url: 'https://example.com' }, format: 'mp4' },
-  {
-    output: { kind: 'writable', stream: createWriteStream('out.mp4') },
-    onProgress: (p) => console.log(p.phase, p.percent),
-    // signal, logger, browserFactory, ffmpegPath, urlPolicy all injectable
-  },
-);
-```
+> **popup** (options) → **background service worker** (broker) → **offscreen document**
+> (capture + encode) + **content script** (DOM prep + wall-clock scroll)
 
-**Safety knobs (relevant before any hosted/untrusted use):** URL inputs are restricted to `http(s)` at the schema level (blocks `file:`/`data:`/`javascript:`). For the future web layer, pass `runtime.urlPolicy(url => { /* throw to deny private/metadata hosts */ })` (consulted before navigation) and set `limits` (`maxWidth`/`maxHeight`/`maxFps`/`maxDurationMs`/`maxSourcePixels`) on the request — these are *enforced* at validation time, not advisory.
+1. The popup sends your options. The background grabs the tab-capture stream while the click's
+   permission is still fresh, and the offscreen document holds onto the track.
+2. The tab reloads, and recording starts at the new page's **first paint** — signalled by a
+   `document_start` content script. Gating any earlier would film the *old* page, because Chrome's
+   *Paint Holding* keeps the old pixels on screen until the new page paints.
+3. The offscreen document encodes: `chrome.tabCapture` → `MediaStreamTrackProcessor` → draw each
+   frame to an `OffscreenCanvas` → [**Mediabunny**](https://mediabunny.dev) `CanvasSource` →
+   H.264 MP4. It films a brief intro (entrance animations), holds at the top, then the content
+   script scrolls the page on an eased, wall-clock timeline.
+4. When the scroll finishes, the offscreen document hands a blob URL to the background, which saves
+   the file as `glissade-<host>-<date>.mp4`.
 
-`output` can be `{kind:'buffer'}` (default), `{kind:'file', path}`, `{kind:'writable', stream}`, or `{kind:'stream'}`. The engine never calls `process.exit` or writes to stdout — it throws typed errors and streams output to wherever you point it, which is exactly what lets the same call back a CLI today and a web service tomorrow (see [docs/azure-architecture.md](docs/azure-architecture.md)).
+Each frame is stamped by its **real elapsed time**, so the output duration matches the live scroll
+even when encoding can't sustain the target fps (Mediabunny normalizes the timestamps onto the fps
+grid). If WebCodecs H.264 isn't available, it falls back to `MediaRecorder` (MP4/avc1, or WebM/VP9).
 
-## Samples
+## Develop
+
+An npm-workspaces monorepo (ESM, TypeScript, Node ≥ 22):
+
+- **`packages/shared`** — the zod `CaptureOptions` schema, `DEFAULTS`, the speed `PROFILES`, and
+  preset normalization. Browser-safe; imported everywhere.
+- **`packages/scroll-engine`** — the pure, unit-tested motion engine: frame plan + easings
+  (`motion.ts`), constant-frame-rate reclock (`reclock.ts`), and DOM prep — consent dismissal,
+  lazy-image neutralizing, stop resolution (`dom-prep.ts`).
+- **`packages/extension`** — the WXT MV3 app (background / content / popup / offscreen).
 
 ```bash
-npm run samples   # writes samples/*.mp4, samples/image-scroll.gif, samples/README.md
+npm run dev        # WXT live-reload dev build
+npm run build      # build shared → scroll-engine → extension
+npm run zip        # build + package the extension .zip
+npm test           # vitest unit tests (pure logic)
+npm run typecheck                                    # root: shared + scroll-engine
+npm run typecheck --workspace=@glissade/extension    # extension self-typecheck
 ```
-
-Covers all four paths (image→MP4, image→GIF, URL animate→MP4, URL static→MP4) using the self-contained animated page in `samples/fixture/`, so they reproduce offline. See [samples/README.md](samples/README.md).
 
 ## Testing
 
-```bash
-npm test          # vitest: unit + integration (browser-driven URL tests included)
-npm run typecheck
-npm run test:docker   # builds the worker image and runs the CLI inside it (needs Docker)
-```
+- **Unit (`npm test`)** — the pure logic only: motion plan, CFR reclock, DOM helpers (under
+  happy-dom), and the schema / profiles / presets.
+- **Manual E2E** — `packages/extension/e2e/` (a fixture page + checklist). The capture path uses
+  `tabCapture` + WebCodecs, which can't run headless, so it's verified by hand on a **GPU-capable
+  Chrome**.
 
-Every functional module has tests: the motion/frame-plan math, input detection, the image and URL frame sources, the ffmpeg encoder, and the end-to-end `capture()` orchestrator. The URL test asserts a scroll-triggered reveal actually fires during capture.
+## Publishing
 
-## ⚠️ Licensing
+A GitHub Actions workflow builds, verifies, and uploads a **draft** to the Chrome Web Store on a
+`v*` tag (you submit/publish from the dashboard). See
+[`docs/publishing-chrome-web-store.md`](docs/publishing-chrome-web-store.md).
 
-`ffmpeg-static` (and `apt` ffmpeg in the container) are **GPL-3.0** builds with `libx264`. Invoking the standalone ffmpeg binary as a separate process is *mere aggregation* — it does **not** place this project's source under the GPL — but if you redistribute, you must ship the GPLv3 text and offer the corresponding ffmpeg source. **H.264/H.265 also carry patent-licensing obligations** for a redistributed or hosted product; get sign-off before deploying the hosted service. `gifski` (a higher-quality GIF encoder) is **AGPL-3.0** and is intentionally not a dependency. A non-GPL encoder fallback (VP9/AV1 WebM) is possible if needed.
+## Limitations
 
-## Project layout
-
-```
-packages/core/    the engine (capture(), motion, frame sources, encoder) — playwright-core + ffmpeg-static only
-packages/shared/  zod schema + Job/JobStatus contracts (shared with the future web layer)
-packages/cli/     thin CLI wrapper (commander)
-packages/worker/  Dockerfile + container test (Phase 0); queue-consumer worker is Phase 1
-scripts/          sample generation
-samples/          fixture page + generated artifacts
-docs/             Azure / web architecture (Phase 2)
-```
+- Keep the captured tab in the foreground for the whole scroll — switching away aborts the capture
+  cleanly.
+- ~60fps is best-effort; it auto-throttles under load and is reclocked to a constant frame rate.
+- DRM/EME video (e.g. Netflix) captures as black — out of scope.
+- Cross-origin iframes can't be scroll-driven; consent/cookie banners are dismissed best-effort.
