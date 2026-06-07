@@ -95,8 +95,9 @@ H.264 is unavailable.
 
 ## Publishing
 
-- CI: `.github/workflows/publish-chrome.yml` builds + zips (`wxt zip`) and publishes to the Chrome Web
-  Store via `wxt submit` on a `v*` tag (manual runs default to a dry-run). Needs repo secrets
+- CI: `.github/workflows/publish-chrome.yml` builds + zips (`wxt zip`) and uploads a **draft** to the
+  Chrome Web Store via `wxt submit --chrome-skip-submit-review` on a `v*` tag (manual runs default to a
+  dry-run); submit-for-review/publish is a manual click in the CWS dashboard. Needs repo secrets
   `CHROME_{EXTENSION_ID,CLIENT_ID,CLIENT_SECRET,REFRESH_TOKEN}`; missing → publish is skipped (build still
   artifacts). **Bump `packages/extension/package.json` version before tagging** (CWS rejects duplicate
   versions). Full setup: `docs/publishing-chrome-web-store.md`.

@@ -3,23 +3,25 @@
 The extension is built and published by the GitHub Actions workflow
 [`.github/workflows/publish-chrome.yml`](../.github/workflows/publish-chrome.yml).
 It installs deps, typechecks, runs the unit tests, builds + zips the MV3 extension
-(`wxt zip`), uploads the zip as a workflow artifact, then publishes via WXT's
-`wxt submit` (which wraps [`publish-extension`](https://www.npmjs.com/package/publish-browser-extension)
-against the Chrome Web Store API).
+(`wxt zip`), uploads the zip as a workflow artifact, then uploads it to the Chrome
+Web Store as a **new draft version** via WXT's `wxt submit` (`--chrome-skip-submit-review`,
+which wraps [`publish-extension`](https://www.npmjs.com/package/publish-browser-extension)
+against the Chrome Web Store API). The draft is **not** submitted for review or
+published automatically — you do that from the Chrome Web Store dashboard.
 
 ## When it runs
 
 | Trigger | Behavior |
 |---|---|
-| Push a tag `v*` (e.g. `v0.2.0`) | Build + verify + **publish** (real submit for review). |
-| Manual run from the **Actions** tab | Build + verify, then a **dry run** by default (verifies auth + zips, no upload). Untick **dry_run** to actually publish. |
+| Push a tag `v*` (e.g. `v0.2.0`) | Build + verify + **upload a new draft** (not submitted for review — you publish it from the dashboard). |
+| Manual run from the **Actions** tab | Build + verify, then a **dry run** by default (verifies auth + zips, no upload). Untick **dry_run** to upload the draft. |
 
-If the Chrome Web Store secrets (below) aren't set, the publish step is **skipped
+If the Chrome Web Store secrets (below) aren't set, the upload step is **skipped
 with a warning** and the build still succeeds — so the workflow doubles as a plain
 build/CI pipeline until the store is wired up. The built `.zip` is always available
 as the **`chrome-mv3-zip`** artifact on the run.
 
-> **Bump the version before each publish.** The Chrome Web Store refuses to
+> **Bump the version before each release.** The Chrome Web Store refuses to
 > re-upload an existing version. WXT derives the manifest version from
 > `packages/extension/package.json` → `"version"`, so bump it (and tag to match,
 > e.g. `v0.2.0`) before releasing.
@@ -38,11 +40,11 @@ Add these under **Settings → Secrets and variables → Actions → New reposit
 ## Getting the credentials (one-time)
 
 1. **Create the store item.** In the [Chrome Web Store developer dashboard](https://chrome.google.com/webstore/devconsole),
-   create the extension item once (upload any build manually, or let the first
-   dry-run-disabled publish create the draft). Copy its **Item ID** →
+   create the extension item once by uploading an initial build manually — the API
+   only *updates* an existing item, so it needs the ID. Copy the **Item ID** →
    `CHROME_EXTENSION_ID`. (For Hexagon's enterprise rollout this item is **unlisted**
    and force-installed via `ExtensionInstallForcelist`; that's a dashboard visibility
-   setting, not a workflow change — keep `CHROME_PUBLISH_TARGET=default`.)
+   setting, not a workflow change.)
 
 2. **Enable the API.** In the [Google Cloud console](https://console.cloud.google.com/),
    create (or pick) a project and enable the **Chrome Web Store API**.
@@ -79,14 +81,17 @@ git tag vX.Y.Z
 git push --follow-tags
 ```
 
-The tag push triggers the workflow, which publishes. To rehearse without
-publishing, run the workflow manually from the Actions tab with **dry_run** left on.
+The tag push triggers the workflow, which uploads a new draft. Then open the Chrome
+Web Store dashboard and click **Submit for review** when you're ready to publish it.
+To rehearse without uploading, run the workflow manually from the Actions tab with
+**dry_run** left on.
 
 ## Notes
 
 - **Dry run still needs valid secrets** — it authenticates against the API (just
   doesn't upload). Use it to confirm the credentials work.
-- After a real publish the item goes into Chrome Web Store **review**; it isn't live
-  instantly (unlisted/enterprise items still pass review).
-- To upload a draft without submitting for review, add `--chrome-skip-submit-review`
-  to the `wxt submit` call in the workflow.
+- A real run uploads a **draft only** (`--chrome-skip-submit-review`) — the new
+  version sits in the dashboard and nothing goes live until you click **Submit for
+  review** there (unlisted/enterprise items still pass review before going live).
+- To make the workflow auto-submit for review on a real run instead, remove
+  `--chrome-skip-submit-review` from the `wxt submit` call in the workflow.

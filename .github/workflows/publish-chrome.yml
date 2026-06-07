@@ -1,7 +1,9 @@
 # Build the MV3 extension and publish it to the Chrome Web Store.
 #
 # Triggers:
-#   • push a tag like v1.2.3   -> builds, verifies, and PUBLISHES
+#   • push a tag like v1.2.3   -> builds, verifies, and uploads a new DRAFT version
+#                                  (it is NOT submitted for review — you submit/publish
+#                                   it from the Chrome Web Store dashboard)
 #   • manual run (Actions tab)  -> "dry_run" (default ON) verifies auth + build only
 #
 # Required repo secrets (Settings → Secrets and variables → Actions). When they are
@@ -112,7 +114,11 @@ jobs:
             echo "configured=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Publish to Chrome Web Store
+      # Draft-only: --chrome-skip-submit-review uploads the zip as a new draft version
+      # but does NOT submit it for review or publish it. Review + publish is a manual
+      # click in the Chrome Web Store dashboard. (To auto-submit for review instead,
+      # drop --chrome-skip-submit-review below.)
+      - name: Upload draft to Chrome Web Store
         if: steps.secrets.outputs.configured == 'true'
         working-directory: packages/extension
         env:
@@ -120,13 +126,12 @@ jobs:
           CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
           CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
           CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
-          CHROME_PUBLISH_TARGET: default
         run: |
-          args=(submit --chrome-zip "${{ steps.zip.outputs.path }}")
+          args=(submit --chrome-zip "${{ steps.zip.outputs.path }}" --chrome-skip-submit-review)
           if [ "${DRY_RUN}" = "true" ]; then
-            echo "Dry run: verifying auth + zip only (no upload, no submit)."
+            echo "Dry run: verifying auth + zip only (no upload)."
             args+=(--dry-run)
           else
-            echo "Publishing to the Chrome Web Store (publishTarget=default)…"
+            echo "Uploading a new draft to the Chrome Web Store (not submitted for review)…"
           fi
           npx --no-install wxt "${args[@]}"
