@@ -60,16 +60,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # The extension imports @page-capture/{shared,scroll-engine} by package name,
+      # The extension imports @glissade/{shared,scroll-engine} by package name,
       # so their dist/ must exist before the extension typechecks or builds.
       - name: Build workspace deps
-        run: npm run build --workspace=@page-capture/shared --workspace=@page-capture/scroll-engine --if-present
+        run: npm run build --workspace=@glissade/shared --workspace=@glissade/scroll-engine --if-present
 
       - name: Typecheck (shared + scroll-engine)
         run: npm run typecheck
 
       - name: Typecheck (extension)
-        run: npm run typecheck --workspace=@page-capture/extension
+        run: npm run typecheck --workspace=@glissade/extension
 
       - name: Unit tests
         run: npm test

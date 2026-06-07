@@ -1,14 +1,14 @@
 {
-  "name": "page-capture-monorepo",
+  "name": "glissade-monorepo",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "engines": { "node": ">=22" },
   "workspaces": ["packages/shared", "packages/scroll-engine", "packages/extension"],
   "scripts": {
-    "build": "npm run build --workspace=@page-capture/shared --workspace=@page-capture/scroll-engine --if-present && npm run build --workspace=@page-capture/extension --if-present",
-    "dev": "npm run dev --workspace=@page-capture/extension",
-    "zip": "npm run zip --workspace=@page-capture/extension",
+    "build": "npm run build --workspace=@glissade/shared --workspace=@glissade/scroll-engine --if-present && npm run build --workspace=@glissade/extension --if-present",
+    "dev": "npm run dev --workspace=@glissade/extension",
+    "zip": "npm run zip --workspace=@glissade/extension",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json --noEmit"

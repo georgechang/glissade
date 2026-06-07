@@ -1,4 +1,4 @@
-import type { ScrollStop } from '@page-capture/shared';
+import type { ScrollStop } from '@glissade/shared';
 
 /** Common "accept cookies" / consent buttons, tried best-effort (text matched case-insensitively). */
 export const DEFAULT_CONSENT_SELECTORS = [

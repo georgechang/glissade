@@ -73,7 +73,7 @@ Add these under **Settings → Secrets and variables → Actions → New reposit
 ```bash
 # 1. bump the version (becomes the manifest version); --no-git-tag-version just
 #    edits package.json so we control the commit + tag explicitly below
-npm version --workspace=@page-capture/extension --no-git-tag-version patch   # or minor/major
+npm version --workspace=@glissade/extension --no-git-tag-version patch   # or minor/major
 
 # 2. commit, then tag to match and push
 git commit -am "release: extension vX.Y.Z"

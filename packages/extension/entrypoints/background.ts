@@ -1,5 +1,5 @@
 import { isMessage, type Msg } from '../src/messages';
-import { CaptureOptionsSchema } from '@page-capture/shared';
+import { CaptureOptionsSchema } from '@glissade/shared';
 
 let activeTabId: number | undefined;
 let activeHost = '';
@@ -93,13 +93,13 @@ export default defineBackground(() => {
       const ext = raw.encoder.includes('webm') ? 'webm' : 'mp4';
       const slug = activeHost.replace(/[^a-z0-9]+/gi, '-').replace(/(^-|-$)/g, '').toLowerCase();
       const date = new Date().toISOString().slice(0, 10);
-      const filename = `page-capture${slug ? `-${slug}` : ''}-${date}.${ext}`;
+      const filename = `glissade${slug ? `-${slug}` : ''}-${date}.${ext}`;
       browser.downloads.download({ url: raw.url, filename, saveAs: true }).catch(() => {});
-      browser.notifications.create({ type: 'basic', iconUrl: icon, title: 'Page Capture', message: `Saved ${filename}` }).catch(() => {});
+      browser.notifications.create({ type: 'basic', iconUrl: icon, title: 'Glissade', message: `Saved ${filename}` }).catch(() => {});
     } else {
       if (activeTabId !== undefined) browser.tabs.sendMessage(activeTabId, { type: 'abort' } satisfies Msg).catch(() => {});
       if (raw.error !== 'Recording cancelled.') {
-        browser.notifications.create({ type: 'basic', iconUrl: icon, title: 'Page Capture', message: `Capture failed: ${raw.error}` }).catch(() => {});
+        browser.notifications.create({ type: 'basic', iconUrl: icon, title: 'Glissade', message: `Capture failed: ${raw.error}` }).catch(() => {});
       }
     }
   });

@@ -1,4 +1,4 @@
-# Manual E2E — page-capture extension
+# Manual E2E — glissade extension
 
 Automated tests cover the pure logic (motion plan, CFR reclock, DOM helpers). The
 capture path uses `tabCapture` + WebCodecs, which don't run headless — so capture
@@ -7,7 +7,7 @@ ideally on a ≥60 Hz display.
 
 ## Setup
 1. Build + load the extension:
-   - `npm run build --workspace=@page-capture/extension`
+   - `npm run build --workspace=@glissade/extension`
    - Chrome → `chrome://extensions` → enable **Developer mode** → **Load unpacked** →
      select `packages/extension/.output/chrome-mv3`.
 2. Serve the fixture (any static server), e.g. from the repo root:
@@ -15,9 +15,9 @@ ideally on a ≥60 Hz display.
    - Open `http://localhost:3000/fixture.html` (port as printed). **Keep this tab in the foreground.**
 
 ## Run
-3. Click the **Page Capture** toolbar button → the popup opens.
+3. Click the **Glissade** toolbar button → the popup opens.
 4. Pick a **Profile** (Slow/Medium/Fast — auto-fills the Advanced timings), **Format** = MP4, **reading** style → click **Record this tab**. Keep the tab focused for the whole scroll.
-5. By default the page **reloads first** (so scroll animations re-arm) — let it finish loading; recording starts automatically after. A `page-capture.mp4` downloads when done (the popup shows `Done (webcodecs-avc).`).
+5. By default the page **reloads first** (so scroll animations re-arm) — let it finish loading; recording starts automatically after. A `glissade.mp4` downloads when done (the popup shows `Done (webcodecs-avc).`).
 
 ## Verify the MP4
 - Opens and plays in **PowerPoint / Keynote / Google Slides / QuickTime**.
@@ -29,7 +29,7 @@ ideally on a ≥60 Hz display.
 
 ## Also check
 6. Repeat at **60** fps (Advanced → FPS; needs a ≥60 Hz display) — should still be smooth.
-7. **GIF**: set Format = GIF, record again → downloads `page-capture.gif` (popup shows `Done (gif).`), downscaled (default 640px) at the GIF fps. Confirm it animates and is a reasonable size.
+7. **GIF**: set Format = GIF, record again → downloads `glissade.gif` (popup shows `Done (gif).`), downscaled (default 640px) at the GIF fps. Confirm it animates and is a reasonable size.
 8. **Profiles**: switch Profile → confirm the Advanced timing fields (page-hold/scroll/velocity/holds) update; editing any flips it to "Custom".
 9. **Preset upload**: pick a `.json` stop-config (e.g. the legacy `stop-configs/hexagoncom-home.json` — a bare `[{selector|offset|percent, holdMs?}]` array, or the extended `{name?,url?,profile?,stops}`). The popup shows "Loaded: N stops"; record on the matching site and confirm it pauses at those stops.
 10. **Reload toggle**: Advanced → uncheck "reload page first" → recording starts immediately on the current page state (no reload).

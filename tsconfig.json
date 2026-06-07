@@ -4,8 +4,8 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@page-capture/shared": ["packages/shared/src/index.ts"],
-      "@page-capture/scroll-engine": ["packages/scroll-engine/src/index.ts"]
+      "@glissade/shared": ["packages/shared/src/index.ts"],
+      "@glissade/scroll-engine": ["packages/scroll-engine/src/index.ts"]
     }
   },
   "include": [

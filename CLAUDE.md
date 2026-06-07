@@ -20,10 +20,10 @@ animations**, all client-side — no server, no upload.
 npm install                                   # provisions WXT; runs `wxt prepare`
 npm run build                                 # builds shared → scroll-engine → extension
 npm run typecheck                             # ROOT tsc: shared + scroll-engine ONLY (see gotcha)
-npm run typecheck --workspace=@page-capture/extension   # extension self-typecheck (wxt prepare && tsc)
+npm run typecheck --workspace=@glissade/extension   # extension self-typecheck (wxt prepare && tsc)
 npm test                                      # vitest (unit tests; pure logic only)
 npm run dev                                   # wxt dev (live-reload extension)
-npm run build --workspace=@page-capture/extension       # → packages/extension/.output/chrome-mv3/
+npm run build --workspace=@glissade/extension       # → packages/extension/.output/chrome-mv3/
 ```
 
 Load in Chrome: `chrome://extensions` → Developer mode → **Load unpacked** →
@@ -104,6 +104,8 @@ H.264 is unavailable.
 
 ## Working style
 
-- The branch is `feat/chrome-extension`. Commit per logical change; don't commit to `main` without asking.
+- `main` is the trunk (the original `feat/chrome-extension` branch was merged in and deleted). Commit per
+  logical change; use a feature branch for larger work and merge when done. Don't force-push or rewrite
+  shared history without asking.
 - Browser-only changes can't be unit-tested — typecheck + build, then rely on the manual E2E. Flag
   runtime-only unknowns (e.g. "does the capture stream survive the reload") rather than asserting them.

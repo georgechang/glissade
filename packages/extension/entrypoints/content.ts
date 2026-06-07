@@ -1,8 +1,8 @@
-import { CaptureOptionsSchema } from '@page-capture/shared';
+import { CaptureOptionsSchema } from '@glissade/shared';
 import {
   buildFramePlan, frameAtElapsed, dismissConsent, hideFixedElements,
   measureStableHeight, neutralizeLazyImages, resolveStops,
-} from '@page-capture/scroll-engine';
+} from '@glissade/scroll-engine';
 import { isMessage } from '../src/messages';
 
 let lastPlan: { totalFrames: number; offsetForFrame: (i: number) => number } | null = null;
@@ -59,7 +59,7 @@ async function prepareAndReportPlan(fps: number, rawOptions: unknown) {
       sleep: (ms) => new Promise((r) => setTimeout(r, ms)) },
   );
   const distance = Math.max(0, Math.round(contentHeight - viewportHeight));
-  const stops = resolveStops(opts.stops, distance, (msg) => console.warn('page-capture:', msg));
+  const stops = resolveStops(opts.stops, distance, (msg) => console.warn('glissade:', msg));
   const plan = buildFramePlan({
     contentHeight, viewportHeight, fps, scrollSpeed: opts.scrollSpeed,
     ...(opts.duration !== undefined ? { duration: opts.duration } : {}),
@@ -83,7 +83,7 @@ async function drive(fps: number, plan: { totalFrames: number; offsetForFrame: (
     if (document.visibilityState === 'hidden' && !driveAborted) {
       driveAborted = true;
       browser.runtime.sendMessage({ type: 'abort', reason: 'The tab lost focus — keep it in front while recording.' }).catch(() => {});
-      console.warn('page-capture: tab left foreground — capture aborted');
+      console.warn('glissade: tab left foreground — capture aborted');
     }
   };
   document.addEventListener('visibilitychange', onVisibility);

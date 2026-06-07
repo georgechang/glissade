@@ -6,7 +6,7 @@ import {
   defaultEasingForStyle,
   normalizePreset,
   type CaptureOptions,
-} from '@page-capture/shared';
+} from '@glissade/shared';
 
 describe('CaptureOptionsSchema', () => {
   it('applies defaults for a minimal URL request', () => {

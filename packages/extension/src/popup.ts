@@ -2,7 +2,7 @@ import { browser } from 'wxt/browser';
 import {
   CaptureOptionsSchema, EASINGS, PROFILES, defaultEasingForStyle, normalizePreset,
   type NormalizedPreset, type ProfileName, type ScrollStop, type ScrollStyle,
-} from '@page-capture/shared';
+} from '@glissade/shared';
 import { isMessage } from './messages';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -166,7 +166,7 @@ void (async () => {
       go.disabled = true;
       go.style.opacity = '0.5';
       go.style.cursor = 'not-allowed';
-      status.textContent = 'Page Capture only records normal web pages (http/https). This page can\'t be recorded.';
+      status.textContent = 'Glissade only records normal web pages (http/https). This page can\'t be recorded.';
     }
   } catch { /* leave enabled */ }
 })();

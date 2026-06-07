@@ -72,7 +72,7 @@ async function go(): Promise<void> {
     const blobType = ext === 'webm' ? 'video/webm' : 'video/mp4';
     const url = URL.createObjectURL(new Blob([buffer], { type: blobType }));
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    browser.runtime.sendMessage({ type: 'capture:done', ok: true, encoder, url, filename: `page-capture.${ext}` } satisfies Msg).catch(() => {});
+    browser.runtime.sendMessage({ type: 'capture:done', ok: true, encoder, url, filename: `glissade.${ext}` } satisfies Msg).catch(() => {});
   } catch (e) {
     const msg = (e as Error).message;
     browser.runtime.sendMessage({ type: 'capture:done', ok: false, error: msg === 'aborted' ? abortReason : msg } satisfies Msg).catch(() => {});

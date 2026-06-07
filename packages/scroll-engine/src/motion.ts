@@ -1,4 +1,4 @@
-import type { EasingName } from '@page-capture/shared';
+import type { EasingName } from '@glissade/shared';
 
 /**
  * The shared motion engine — the single source of truth for how a scroll maps

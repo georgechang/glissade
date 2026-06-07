@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * @page-capture/shared — the framework-agnostic contracts shared by every surface
+ * @glissade/shared — the framework-agnostic contracts shared by every surface
  * (the core engine, the CLI, and the future web API / worker / SPA).
  *
  * A `CaptureOptions` value is the fully-serializable description of *what to

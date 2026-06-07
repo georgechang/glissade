@@ -1,5 +1,5 @@
 {
-  "name": "@page-capture/extension",
+  "name": "@glissade/extension",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,8 +11,8 @@
     "typecheck": "wxt prepare && tsc --noEmit"
   },
   "dependencies": {
-    "@page-capture/scroll-engine": "*",
-    "@page-capture/shared": "*",
+    "@glissade/scroll-engine": "*",
+    "@glissade/shared": "*",
     "mediabunny": "^1.46.0"
   },
   "devDependencies": {

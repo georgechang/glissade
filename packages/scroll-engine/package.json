@@ -1,5 +1,5 @@
 {
-  "name": "@page-capture/scroll-engine",
+  "name": "@glissade/scroll-engine",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -8,5 +8,5 @@
   "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
   "files": ["dist"],
   "scripts": { "build": "tsup src/index.ts --format esm --dts --clean" },
-  "dependencies": { "@page-capture/shared": "*" }
+  "dependencies": { "@glissade/shared": "*" }
 }
