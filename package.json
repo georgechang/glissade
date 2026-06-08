@@ -2,6 +2,7 @@
   "name": "glissade-monorepo",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "engines": { "node": ">=22" },
   "workspaces": ["packages/shared", "packages/scroll-engine", "packages/extension"],

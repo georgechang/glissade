@@ -1,7 +1,9 @@
 # Glissade
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) ![Chrome MV3](https://img.shields.io/badge/Chrome-MV3-4285F4?logo=googlechrome&logoColor=white) ![Node ≥22](https://img.shields.io/badge/Node-%E2%89%A522-339933?logo=nodedotjs&logoColor=white) [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#contributing)
+
 Record the active browser tab **scrolling down a page** into a smooth **H.264 MP4** — captured
-right in your real browser, with no server and no upload.
+right in your real browser, with no server and no upload. Free and **open source**.
 
 Glissade is a Chrome (Manifest V3) extension. Open any page, hit record, and it reloads the tab,
 starts filming at the new page's first paint (so the entrance/on-load animations are in the clip),
@@ -23,6 +25,8 @@ no telemetry.
 ## Install (load unpacked)
 
 ```bash
+git clone https://github.com/georgechang/glissade.git
+cd glissade
 npm install
 npm run build
 ```
@@ -30,7 +34,8 @@ npm run build
 Then in Chrome: `chrome://extensions` → enable **Developer mode** → **Load unpacked** → select
 `packages/extension/.output/chrome-mv3`. After each rebuild, click the extension's **reload ↻**.
 
-(For end users it ships via the Chrome Web Store / enterprise force-install — see [Publishing](#publishing).)
+Building from source is the way to run it today; a Chrome Web Store listing is published from this
+repo (see [Publishing](#publishing)).
 
 ## Using it
 
@@ -126,6 +131,27 @@ npm run typecheck --workspace=@glissade/extension    # extension self-typecheck
   `tabCapture` + WebCodecs, which can't run headless, so it's verified by hand on a **GPU-capable
   Chrome**.
 
+## Contributing
+
+Contributions are welcome — issues and pull requests alike. Glissade is an npm-workspaces monorepo;
+see [Develop](#develop) for the layout and commands.
+
+1. Fork, clone, and `npm install`.
+2. Make your change. Keep the pure logic in `scroll-engine` / `shared` covered by unit tests.
+3. Before opening a PR, make sure these are green:
+
+   ```bash
+   npm run typecheck
+   npm run typecheck --workspace=@glissade/extension
+   npm test
+   npm run build
+   ```
+
+   The capture path (tabCapture/WebCodecs) can't be unit-tested, so also sanity-check it by hand on a
+   GPU-capable Chrome — see `packages/extension/e2e/`.
+4. Open a PR against `main` with a clear description. Found a bug or have an idea?
+   [Open an issue](https://github.com/georgechang/glissade/issues).
+
 ## Publishing
 
 A GitHub Actions workflow builds, verifies, and uploads a **draft** to the Chrome Web Store on a
@@ -139,3 +165,12 @@ A GitHub Actions workflow builds, verifies, and uploads a **draft** to the Chrom
 - ~60fps is best-effort; it auto-throttles under load and is reclocked to a constant frame rate.
 - DRM/EME video (e.g. Netflix) captures as black — out of scope.
 - Cross-origin iframes can't be scroll-driven; consent/cookie banners are dismissed best-effort.
+
+## Acknowledgements
+
+Built with [WXT](https://wxt.dev) (extension framework) and [Mediabunny](https://mediabunny.dev)
+(in-browser H.264 / MP4 encoding).
+
+## License
+
+[MIT](LICENSE) © 2026 George Chang
