@@ -5,7 +5,7 @@ import {
 } from '@glissade/scroll-engine';
 import { isMessage } from '../src/messages';
 
-let lastPlan: { totalFrames: number; offsetForFrame: (i: number) => number } | null = null;
+let lastPlan: { totalFrames: number; offsetAtElapsed: (elapsedMs: number) => number } | null = null;
 let driveAborted = false;
 
 export default defineContentScript({
@@ -69,12 +69,12 @@ async function prepareAndReportPlan(fps: number, rawOptions: unknown) {
     pageHoldMs: opts.pageHoldMs, pageScrollMs: opts.pageScrollMs, pageFraction: opts.pageFraction,
     ...(stops ? { stops } : {}),
   });
-  lastPlan = { totalFrames: plan.totalFrames, offsetForFrame: plan.offsetForFrame };
+  lastPlan = { totalFrames: plan.totalFrames, offsetAtElapsed: plan.offsetAtElapsed };
   const dpr = Math.min(window.devicePixelRatio || 1, 2); // capture at native px (capped 2×) → crisp text
   return { totalFrames: plan.totalFrames, width: Math.round(window.innerWidth * dpr), height: Math.round(viewportHeight * dpr) };
 }
 
-async function drive(fps: number, plan: { totalFrames: number; offsetForFrame: (i: number) => number }) {
+async function drive(fps: number, plan: { totalFrames: number; offsetAtElapsed: (elapsedMs: number) => number }) {
   driveAborted = false;
   window.scrollTo(0, 0);
   await new Promise((r) => requestAnimationFrame(() => r(undefined)));
@@ -89,12 +89,24 @@ async function drive(fps: number, plan: { totalFrames: number; offsetForFrame: (
   document.addEventListener('visibilitychange', onVisibility);
   try {
     await new Promise<void>((resolve) => {
+      let lastProgressAt = -Infinity;
       const tick = () => {
         if (driveAborted) { resolve(); return; }
-        const frame = frameAtElapsed(performance.now() - t0, fps, plan.totalFrames);
-        window.scrollTo(0, plan.offsetForFrame(frame));
-        browser.runtime.sendMessage({ type: 'drive:progress', frame, totalFrames: plan.totalFrames }).catch(() => {});
-        if (frame >= plan.totalFrames - 1) { resolve(); return; }
+        const elapsed = performance.now() - t0;
+        // Scroll to the CONTINUOUS position for this instant, updated every animation
+        // frame. (The old code quantized to frameAtElapsed → offsetForFrame, so the page
+        // only moved on the fps grid — 30 steps/sec — which looked choppy live and was
+        // captured choppy.) frameAtElapsed is still the authoritative end/progress clock.
+        window.scrollTo(0, plan.offsetAtElapsed(elapsed));
+        const frame = frameAtElapsed(elapsed, fps, plan.totalFrames);
+        const atEnd = frame >= plan.totalFrames - 1;
+        // Throttle progress to ~10/s; sending an IPC message every rAF added needless
+        // main-thread/SW churn during the scroll. Always emit the final frame.
+        if (atEnd || elapsed - lastProgressAt >= 100) {
+          lastProgressAt = elapsed;
+          browser.runtime.sendMessage({ type: 'drive:progress', frame, totalFrames: plan.totalFrames }).catch(() => {});
+        }
+        if (atEnd) { resolve(); return; }
         requestAnimationFrame(tick);
       };
       requestAnimationFrame(tick);

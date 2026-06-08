@@ -88,8 +88,14 @@ export interface FramePlan {
   scrollSeconds: number;
   /** Total scrollable distance D = max(0, contentHeight - viewportHeight). */
   distance: number;
-  /** Integer scroll offset (CSS px) for a given frame index. */
+  /** Integer scroll offset (CSS px) for a given frame index (accepts fractional positions). */
   offsetForFrame: (i: number) => number;
+  /**
+   * Continuous scroll offset (CSS px) at real elapsed time. The live scroll driver
+   * calls this every animation frame so motion runs at the display's refresh rate
+   * instead of stepping on the coarse fps grid (which `frameAtElapsed` quantizes to).
+   */
+  offsetAtElapsed: (elapsedMs: number) => number;
 }
 
 const clampRange = (value: number, lo: number, hi: number): number =>
@@ -224,6 +230,15 @@ export function buildFramePlan(params: FramePlanParams): FramePlan {
     return last ? last.to : 0;
   };
 
+  // Map real elapsed time onto a fractional frame position and evaluate the plan
+  // there. offsetForFrame interpolates within segments, so this yields smooth,
+  // sub-frame motion — the live driver no longer quantizes the scroll to fps steps.
+  const offsetAtElapsed = (elapsedMs: number): number => {
+    const lastFrame = totalFrames - 1;
+    const f = (elapsedMs / 1000) * fps;
+    return offsetForFrame(f < 0 ? 0 : f > lastFrame ? lastFrame : f);
+  };
+
   return {
     totalFrames,
     scrollFrames,
@@ -232,5 +247,6 @@ export function buildFramePlan(params: FramePlanParams): FramePlan {
     scrollSeconds: scrollFrames / fps,
     distance,
     offsetForFrame,
+    offsetAtElapsed,
   };
 }

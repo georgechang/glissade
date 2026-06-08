@@ -111,6 +111,50 @@ describe('buildFramePlan', () => {
   });
 });
 
+describe('offsetAtElapsed — continuous (sub-frame) scroll position', () => {
+  const fps = base.fps;
+  const msForFrame = (f: number): number => (f / fps) * 1000;
+
+  it('matches the discrete plan at the start and end', () => {
+    const plan = buildFramePlan(base);
+    expect(plan.offsetAtElapsed(0)).toBe(0);
+    expect(plan.offsetAtElapsed(msForFrame(plan.totalFrames - 1)))
+      .toBe(plan.offsetForFrame(plan.totalFrames - 1));
+  });
+
+  it('clamps out-of-range time to the first/last position', () => {
+    const plan = buildFramePlan(base);
+    expect(plan.offsetAtElapsed(-100)).toBe(0);
+    expect(plan.offsetAtElapsed(1e9)).toBe(plan.offsetForFrame(plan.totalFrames - 1));
+  });
+
+  it('resolves BETWEEN frame boundaries — the half-frame sits strictly between its neighbours', () => {
+    // The whole point: a live scroll updating every rAF must not be quantized to the
+    // fps grid. In the steep middle of the scroll, the half-frame offset lands strictly
+    // between the two bracketing whole-frame offsets (it would equal one of them if the
+    // position only changed on fps boundaries).
+    const plan = buildFramePlan(base);
+    const n = plan.holdFramesTop + Math.floor(plan.scrollFrames / 2);
+    const lo = plan.offsetForFrame(n);
+    const hi = plan.offsetForFrame(n + 1);
+    const mid = plan.offsetAtElapsed(msForFrame(n + 0.5));
+    expect(lo).toBeLessThan(hi); // sanity: scroll is actually moving here
+    expect(mid).toBeGreaterThan(lo);
+    expect(mid).toBeLessThan(hi);
+  });
+
+  it('is monotonically non-decreasing across fine sub-frame steps', () => {
+    const plan = buildFramePlan(base);
+    const endMs = msForFrame(plan.totalFrames - 1);
+    let prev = -1;
+    for (let ms = 0; ms <= endMs; ms += msForFrame(0.25)) {
+      const o = plan.offsetAtElapsed(ms);
+      expect(o).toBeGreaterThanOrEqual(prev);
+      prev = o;
+    }
+  });
+});
+
 const reading: FramePlanParams = {
   contentHeight: 2400,
   viewportHeight: 600,
