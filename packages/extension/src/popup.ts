@@ -232,6 +232,7 @@ go.addEventListener('click', () => {
   const optionsInput: Record<string, unknown> = {
     input: { kind: 'url', url: 'https://placeholder.local/' }, // ignored by the extension; satisfies the schema
     fps: Number(($('fps') as HTMLSelectElement).value),
+    captureQuality: ($('captureQuality') as HTMLSelectElement).value,
     scrollStyle: ($('style') as HTMLSelectElement).value,
     roundTrip: ($('roundTrip') as HTMLInputElement).checked,
     scrollSpeed: numVal('velocity'),

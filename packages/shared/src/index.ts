@@ -38,6 +38,20 @@ export type WaitUntil = (typeof WAIT_UNTIL)[number];
 export const SCROLL_STYLES = ['reading', 'continuous'] as const;
 export type ScrollStyle = (typeof SCROLL_STYLES)[number];
 
+// Cap on the captured stream's resolution. Software H.264 encode of a 4K tab tops out
+// well below 30fps, so the muxer duplicates frames onto the CFR grid and the scroll
+// judders. Capping the capture box keeps the encoder real-time (and a smaller config
+// may engage the hardware encoder). 'full' = no cap (smooth only where hardware can
+// encode the native resolution).
+export const CAPTURE_QUALITIES = ['1080p', '1440p', 'full'] as const;
+export type CaptureQuality = (typeof CAPTURE_QUALITIES)[number];
+/** Max capture box (device px) per quality; the stream is fit within it, preserving aspect. */
+export const CAPTURE_QUALITY_CAPS: Record<CaptureQuality, { maxWidth: number; maxHeight: number } | null> = {
+  '1080p': { maxWidth: 1920, maxHeight: 1080 },
+  '1440p': { maxWidth: 2560, maxHeight: 1440 },
+  full: null,
+};
+
 export const CAPTURE_PHASES = [
   'launch',
   'navigate',
@@ -53,6 +67,8 @@ export const DEFAULTS = {
   width: 1920,
   height: 1080,
   fps: 30,
+  /** Cap on captured stream resolution (extension live capture). Keeps the encoder real-time. */
+  captureQuality: '1080p',
   // deviceScaleFactor. 1 = output dims == CSS layout width (true desktop layout).
   // >1 supersamples (renders at scale×, downscaled to output) for crisper text.
   scale: 1,
@@ -197,6 +213,8 @@ export const CaptureOptionsSchema = z
       })
       .default({}),
     fps: z.number().int().positive().default(DEFAULTS.fps),
+    /** Extension live capture: cap the captured stream's resolution so the encoder stays real-time. */
+    captureQuality: z.enum(CAPTURE_QUALITIES).default(DEFAULTS.captureQuality),
     /** Explicit scroll-phase duration in seconds; overrides scrollSpeed + clamps. */
     duration: z.number().positive().optional(),
     /** Scroll speed in viewport-heights per second. */

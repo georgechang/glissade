@@ -3,8 +3,9 @@ export type Msg =
   | { type: 'ui:start'; options: unknown } // options validated by zod in the popup
   // background → content
   | { type: 'drive:start'; fps: number; options: unknown }
-  // background → offscreen: acquire the tab stream now (consume the fresh streamId), hold it
-  | { type: 'capture:acquire'; streamId: string; fps: number }
+  // background → offscreen: acquire the tab stream now (consume the fresh streamId), hold it.
+  // maxWidth/maxHeight cap the captured resolution so the encoder can keep up with fps.
+  | { type: 'capture:acquire'; streamId: string; fps: number; maxWidth?: number; maxHeight?: number }
   // background → offscreen: start encoding the held track (dimensions from first frame)
   | { type: 'capture:go' }
   // background → offscreen: tighten the runaway frame cap

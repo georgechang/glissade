@@ -1,5 +1,5 @@
 import { isMessage, type Msg } from '../src/messages';
-import { CaptureOptionsSchema } from '@glissade/shared';
+import { CaptureOptionsSchema, CAPTURE_QUALITY_CAPS } from '@glissade/shared';
 
 let activeTabId: number | undefined;
 let activeHost = '';
@@ -125,7 +125,9 @@ async function start(options: unknown): Promise<void> {
   //    holds the track across the reload.
   const streamId = await browser.tabCapture.getMediaStreamId({ targetTabId: tab.id });
   await ensureOffscreen();
-  await browser.runtime.sendMessage({ type: 'capture:acquire', streamId, fps } satisfies Msg);
+  // Cap capture resolution so the encoder stays real-time (uncapped 4K can't sustain fps).
+  const cap = CAPTURE_QUALITY_CAPS[opts.captureQuality];
+  await browser.runtime.sendMessage({ type: 'capture:acquire', streamId, fps, ...(cap ?? {}) } satisfies Msg);
 
   // 2) Optionally reload the tab so scroll-triggered animations re-arm.
   const phase = (p: string) => { browser.runtime.sendMessage({ type: 'capture:phase', phase: p } satisfies Msg).catch(() => {}); };

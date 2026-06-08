@@ -268,6 +268,16 @@
           </div>
         </div>
         <div class="row">
+          <div class="field">
+            <span class="lbl">Capture quality <button type="button" class="info" data-tip="Caps the recorded resolution. Capturing a 4K tab can overwhelm the H.264 encoder — it falls below the target fps and the video judders. 1080p/1440p keep encoding real-time (smoother, smaller files); Full is crispest but only smooth if your machine can encode the native resolution in real time.">i</button></span>
+            <select id="captureQuality" aria-label="Capture quality">
+              <option value="1080p" selected>1080p (smoothest)</option>
+              <option value="1440p">1440p</option>
+              <option value="full">Full resolution</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
           <div class="field reading-only">
             <span class="lbl">Page hold (ms) <button type="button" class="info" data-tip="Reading style: how long to dwell on each screen — and at the top before the first scroll — in milliseconds.">i</button></span>
             <input type="number" id="pageHold" min="0" aria-label="Page hold in milliseconds" />

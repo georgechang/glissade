@@ -17,6 +17,7 @@ describe('CaptureOptionsSchema', () => {
     expect(parsed.size.width).toBe(DEFAULTS.width);
     expect(parsed.size.height).toBe(DEFAULTS.height);
     expect(parsed.fps).toBe(DEFAULTS.fps);
+    expect(parsed.captureQuality).toBe('1080p');
     expect(parsed.easing).toBe('easeInOut');
     expect(parsed.urlMode).toBe('animate');
     expect(parsed.warmup).toBe('images');

@@ -35,7 +35,11 @@ async function acquire(m: Extract<Msg, { type: 'capture:acquire' }>): Promise<vo
   acquireError = '';
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: m.streamId, maxFrameRate: m.fps } } as MediaTrackConstraints,
+      video: { mandatory: {
+        chromeMediaSource: 'tab', chromeMediaSourceId: m.streamId, maxFrameRate: m.fps,
+        // Cap resolution (preserves aspect) so the encoder can sustain fps; absent = native.
+        ...(m.maxWidth ? { maxWidth: m.maxWidth, maxHeight: m.maxHeight } : {}),
+      } } as MediaTrackConstraints,
     });
     const track = stream.getVideoTracks()[0] as MediaStreamVideoTrack;
     track.addEventListener('ended', () => { if (!abortReason) abortReason = 'The captured tab was closed or the stream ended.'; controller.abort(); });
