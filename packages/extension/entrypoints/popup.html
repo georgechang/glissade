@@ -48,8 +48,11 @@
       header p { font-size: 11px; color: var(--muted); margin: 1px 0 0; }
 
       .field { margin-bottom: 13px; }
-      .row { display: flex; gap: 11px; }
-      .row > .field { flex: 1; margin-bottom: 13px; }
+      /* Spacing belongs to the row so single-field (full-width) rows get the same
+         gap below them as paired rows — a child margin-bottom isn't reliably
+         reserved under the row's default align-items: stretch. */
+      .row { display: flex; gap: 11px; margin-bottom: 13px; }
+      .row > .field { flex: 1; margin-bottom: 0; }
       .lbl {
         display: flex; align-items: center; white-space: nowrap; font-size: 10.5px; font-weight: 600;
         color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 6px;
