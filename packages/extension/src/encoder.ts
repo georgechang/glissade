@@ -1,5 +1,5 @@
 /// <reference types="dom-mediacapture-transform" />
-import { Output, Mp4OutputFormat, BufferTarget, CanvasSource, canEncodeVideo } from 'mediabunny';
+import { Output, Mp4OutputFormat, BufferTarget, MediaStreamVideoTrackSource, canEncodeVideo } from 'mediabunny';
 
 export interface EncodeParams {
   track: MediaStreamVideoTrack;
@@ -8,7 +8,7 @@ export interface EncodeParams {
   signal: AbortSignal;
   /** Aborted when the scroll has finished — the encoder then finalizes what it has. */
   done: AbortSignal;
-  /** Dynamic cap updated by capture:bound messages; encoder respects the latest value. */
+  /** Legacy frame cap (capture:bound); unused by the track-source path, kept for the message protocol. */
   maxFramesRef?: { current: number };
 }
 export interface EncodeResult { buffer: ArrayBuffer; encoder: string }
@@ -16,93 +16,86 @@ export interface EncodeResult { buffer: ArrayBuffer; encoder: string }
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /**
- * Read the live tab track, size the canvas from the FIRST captured frame (no dims
- * passed in), and encode on a fixed 1/fps clock. Empty slots duplicate the held
- * frame; bursts are dropped (latest wins). The dynamic maxFramesRef cap is tightened
- * by capture:bound once the scroll plan is known.
+ * Encode the live tab track to H.264 MP4. Mediabunny's MediaStreamVideoTrackSource
+ * pulls VideoFrames straight off the track into the encoder — no OffscreenCanvas
+ * round-trip (drawImage + recapture), and no separate setTimeout pacing loop whose
+ * clock beat against the capture cadence and produced duplicated/skipped frames. The
+ * source samples the track at `fps` and the muxer snaps timestamps to that CFR grid
+ * (frameRate metadata), so output duration tracks real capture time and static holds
+ * extend the last frame. Stops on the scroll-done signal; a long backstop guards a
+ * lost done message. Falls back to MediaRecorder when WebCodecs AVC is unavailable.
  */
 export async function encodeTabStream(p: EncodeParams): Promise<EncodeResult> {
   if (p.track.readyState === 'ended') throw new Error('capture track already ended');
   const bitrate = p.bitrate ?? 14_000_000;
-  const reader = new MediaStreamTrackProcessor({ track: p.track, maxBufferSize: 1 }).readable.getReader();
 
-  // Read the first non-degenerate frame to seed the canvas dimensions (this is the
-  // first frame AFTER capture:go, i.e. the new page at first paint).
-  let latest: VideoFrame | null = null;
-  const seedDeadline = performance.now() + 3000;
-  while (!latest) {
-    if (p.signal.aborted) { await reader.cancel().catch(() => {}); p.track.stop(); throw new Error('aborted'); }
-    const { value, done } = await reader.read();
-    if (done) break;
-    if (value.displayWidth > 0 && value.displayHeight > 0) { latest = value; break; }
-    value.close();
-    if (performance.now() > seedDeadline) break;
+  // Dimensions come from the track's settings (it has been capturing since acquire).
+  // H.264 needs even dimensions, so round down. If settings are unavailable the
+  // canEncodeVideo check below fails and we fall back to MediaRecorder.
+  const settings = p.track.getSettings();
+  const W = (settings.width ?? 0) & ~1;
+  const H = (settings.height ?? 0) & ~1;
+
+  // Configure the encoder for live capture, not offline quality. latencyMode is the
+  // key smoothness lever: the default 'quality' buffers/reorders frames and never
+  // drops any, deepening the encoder queue until the source can't keep up with the
+  // live frame rate — Mediabunny then duplicates frames onto the CFR grid and the
+  // scroll judders. 'realtime' keeps the encoder shallow so throughput tracks fps.
+  // prefer-hardware (a big win at 2x DPR) is tried first, then no-preference, then
+  // MediaRecorder — HW-less machines still record. The support check carries the same
+  // hints so a config that passes here can't fail at start().
+  const base = { width: W, height: H, bitrate, latencyMode: 'realtime' as const };
+  let hardwareAcceleration: 'prefer-hardware' | 'no-preference' | undefined;
+  if (W >= 2 && H >= 2) {
+    if (await canEncodeVideo('avc', { ...base, hardwareAcceleration: 'prefer-hardware' })) hardwareAcceleration = 'prefer-hardware';
+    else if (await canEncodeVideo('avc', { ...base, hardwareAcceleration: 'no-preference' })) hardwareAcceleration = 'no-preference';
   }
-  if (!latest) { await reader.cancel().catch(() => {}); p.track.stop(); throw new Error('no capture frame received'); }
-  const W = latest.displayWidth & ~1;
-  const H = latest.displayHeight & ~1;
+  if (hardwareAcceleration === undefined) return recordWithMediaRecorder(p);
 
-  if (!(await canEncodeVideo('avc', { width: W, height: H, bitrate }))) {
-    latest.close();
-    await reader.cancel().catch(() => {});
-    return recordWithMediaRecorder(p);
-  }
-
-  const canvas = new OffscreenCanvas(W, H);
-  const ctx = canvas.getContext('2d', { alpha: false })!;
+  // Resize to even dimensions only when the source is actually odd (rare); otherwise
+  // frames reach the encoder untouched — no per-frame resize pass.
+  const odd = (settings.width ?? W) !== W || (settings.height ?? H) !== H;
   const output = new Output({ format: new Mp4OutputFormat({ fastStart: 'in-memory' }), target: new BufferTarget() });
-  const source = new CanvasSource(canvas, { codec: 'avc', bitrate });
+  const source = new MediaStreamVideoTrackSource(
+    p.track,
+    { codec: 'avc', bitrate, latencyMode: 'realtime', hardwareAcceleration,
+      ...(odd ? { transform: { width: W, height: H } } : {}) },
+    { frameRate: p.fps },
+  );
   output.addVideoTrack(source, { frameRate: p.fps });
+
+  // errorPromise never resolves; it rejects on an internal source error. Carry the
+  // error in the resolved value so it can lose/win the stop race below without hanging.
+  type Stop = 'done' | 'abort' | { error: Error };
+  const errored: Promise<Stop> = source.errorPromise.then(
+    () => ({ error: new Error('encoder error') }),
+    (e: unknown) => ({ error: e instanceof Error ? e : new Error(String(e)) }),
+  );
+
   await output.start();
 
-  // Pump: keep the freshest frame in `latest` (seed is already set).
-  let reading = true;
-  const pump = (async () => {
-    try {
-      while (reading) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        latest?.close();
-        latest = value;
-      }
-    } finally {
-      latest?.close();
-      latest = null;
-    }
-  })();
+  // Run until the scroll finishes (done), the user aborts, the source errors, or the
+  // backstop trips. No frame-count cap and no pacing loop: the source paces itself off
+  // the track and the muxer enforces CFR.
+  const onAbort = (sig: AbortSignal, tag: 'done' | 'abort'): Promise<Stop> =>
+    new Promise((res) => {
+      if (sig.aborted) res(tag);
+      else sig.addEventListener('abort', () => res(tag), { once: true });
+    });
+  let backstopId: ReturnType<typeof setTimeout>;
+  const backstop: Promise<Stop> = new Promise((res) => { backstopId = setTimeout(() => res('done'), 20 * 60 * 1000); });
+  const reason = await Promise.race([onAbort(p.done, 'done'), onAbort(p.signal, 'abort'), errored, backstop]);
+  clearTimeout(backstopId!);
 
-  const slotMs = 1000 / p.fps;
-  const FIXED_SAFETY = 600 * p.fps; // 20-min absolute backstop; drive:done + capture:bound are the real stops
-  const t0 = performance.now();
-  // Stamp each frame with its REAL elapsed time, not n/fps. The loop is paced to
-  // ~fps, but if encoding can't sustain fps (e.g. large/HiDPI frames) the loop
-  // falls behind real time; using n/fps then compresses the timeline so playback
-  // runs faster than the live scroll. Real timestamps keep the output duration ==
-  // the actual capture duration (Mediabunny normalizes them to the fps grid).
-  let lastStamp = -1;
-  try {
-    for (let n = 0; ; n++) {
-      if (n >= Math.min(p.maxFramesRef?.current ?? FIXED_SAFETY, FIXED_SAFETY)) break;
-      if (p.signal.aborted) throw new Error('aborted');
-      if (p.done.aborted) break;
-      const due = t0 + n * slotMs;
-      const wait = due - performance.now();
-      if (wait > 0) await sleep(wait);
-      if (p.signal.aborted) throw new Error('aborted');
-      if (p.done.aborted) break;
-      if (latest) ctx.drawImage(latest, 0, 0, W, H);
-      const stamp = Math.max((performance.now() - t0) / 1000, lastStamp + slotMs / 4000); // real elapsed, strictly increasing
-      lastStamp = stamp;
-      await source.add(stamp, 1 / p.fps);
-    }
-  } finally {
-    reading = false;
-    reader.cancel().catch(() => undefined);
-    await pump.catch(() => undefined);
-    (latest as VideoFrame | null)?.close();
+  if (reason !== 'done') {
+    await output.cancel().catch(() => {});
     p.track.stop();
+    throw reason === 'abort' ? new Error('aborted') : reason.error;
   }
+
+  source.pause(); // stop pulling frames, then flush the encoder
   await output.finalize();
+  p.track.stop();
   return { buffer: output.target.buffer!, encoder: 'webcodecs-avc' };
 }
 
