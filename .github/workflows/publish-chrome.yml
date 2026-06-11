@@ -93,6 +93,9 @@ jobs:
         with:
           name: chrome-mv3-zip
           path: packages/extension/.output/*-chrome.zip
+          # .output is a hidden dir; upload-artifact@v4 (>=4.4) excludes hidden
+          # paths by default, so without this it finds nothing despite the glob.
+          include-hidden-files: true
           if-no-files-found: error
 
       - name: Check Chrome Web Store secrets
